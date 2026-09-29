@@ -1,13 +1,6 @@
 import type { CSSProperties } from "react";
-import {
-  Aperture,
-  ArrowLink,
-  ExternalLink,
-  Label,
-  Lines,
-  type MediaAsset,
-  SiteLink,
-} from "./primitives";
+import { Aperture, type MediaAsset } from "./aperture";
+import { ArrowLink, ExternalLink, Label, Lines, SiteLink } from "./primitives";
 
 /**
  * Project components (design system §7.2): ProjectFeature, ProjectTile, ProjectRows,

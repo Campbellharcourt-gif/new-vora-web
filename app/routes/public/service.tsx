@@ -8,8 +8,8 @@ import {
 } from "~/.server/services/published-content";
 import { getSetting } from "~/.server/services/settings";
 import { Blocks } from "~/components/content/Blocks";
+import { Aperture } from "~/components/vora/aperture";
 import {
-  Aperture,
   BackLink,
   Invitation,
   Label,
