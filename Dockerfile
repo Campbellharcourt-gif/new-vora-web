@@ -20,12 +20,9 @@ FROM ${NODE_IMAGE} AS build
 WORKDIR /app
 ENV NODE_ENV=development
 COPY package.json package-lock.json .npmrc ./
-# `build_ca` is an OPTIONAL BuildKit secret for building behind a TLS-intercepting proxy (e.g. a
-# corporate network or a sandbox): mounted only for this step, never stored in a layer. Railway and
-# a normal build don't pass it.
-RUN --mount=type=secret,id=build_ca \
-    if [ -f /run/secrets/build_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/build_ca; fi; \
-    npm ci --no-audit --no-fund
+# No BuildKit secret mounts (Railway's builder rejects them). The build reads no secret: npm uses
+# the public registry over normal TLS.
+RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npx react-router build \
  && rm -f build/server/.dev.vars
@@ -35,9 +32,7 @@ FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json package-lock.json .npmrc ./
-RUN --mount=type=secret,id=build_ca \
-    if [ -f /run/secrets/build_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/build_ca; fi; \
-    npm ci --omit=dev --no-audit --no-fund \
+RUN npm ci --omit=dev --no-audit --no-fund \
  && npm cache clean --force
 
 # --- 3. Runtime ------------------------------------------------------------------------------------
@@ -59,7 +54,8 @@ COPY docker/litestream.file.yml ./docker/litestream.file.yml
 COPY migrations ./migrations
 COPY docker/entrypoint.sh /usr/local/bin/vora-entrypoint
 
-# The application directory is read-only for the service user; only /data (the volume) is written.
+# The application directory is read-only for the service user; only /data is written. /data is the
+# mount point for the Railway volume, attached by Railway (no Dockerfile VOLUME: Railway rejects it).
 RUN chmod 0555 /usr/local/bin/vora-entrypoint \
  && mkdir -p /data \
  && chown node:node /data \
@@ -67,7 +63,6 @@ RUN chmod 0555 /usr/local/bin/vora-entrypoint \
 
 USER node
 EXPOSE 3000
-VOLUME ["/data"]
 
 # Started directly (never through npm, which swallows SIGTERM). The entrypoint restores from the
 # Litestream replica when the volume is empty, then runs the server under `litestream replicate`
