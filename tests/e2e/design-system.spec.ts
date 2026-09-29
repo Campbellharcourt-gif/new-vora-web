@@ -120,6 +120,31 @@ test.describe("design system — the menu below 1024 px", () => {
       .click();
     await expect(page).toHaveURL(/\/careers$/);
     await expect(page.getByRole("dialog", { name: "Menu" })).toHaveCount(0);
+    // Focus reaches the new page's heading, not <body>, once the dialog stops the page being inert.
+    await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
+    await expect(page.locator("#main")).not.toHaveAttribute("inert", "");
+  });
+
+  test("with reduced motion, a destination still moves focus to the new heading", async ({
+    browser,
+    baseURL,
+  }) => {
+    const context = await browser.newContext({
+      reducedMotion: "reduce",
+      viewport: { width: 390, height: 844 },
+      baseURL,
+    });
+    const page = await context.newPage();
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    await page.getByRole("button", { name: "Menu" }).click();
+    await page
+      .getByRole("dialog", { name: "Menu" })
+      .getByRole("link", { name: /Services/ })
+      .click();
+    await expect(page).toHaveURL(/\/services$/);
+    await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
+    await context.close();
   });
 
   test("works without JavaScript (the server-rendered <details> menu)", async ({

@@ -1057,13 +1057,6 @@
       display: none;
     }
   }
-  .v-feature:focus-within {
-    outline: 2px solid var(--color-focus);
-    outline-offset: 6px;
-  }
-  .v-feature a:focus-visible {
-    outline: none;
-  }
   .v-features {
     display: grid;
     gap: var(--section-s);

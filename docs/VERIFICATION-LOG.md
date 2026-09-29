@@ -432,7 +432,7 @@ two stale code comments. **Nothing was deployed, purchased or created; no data m
 - **Lighthouse on a mid-range phone** (LCP, CLS, INP) — not measured here.
 - **Ask VORA with the real provider** — needs `GEMINI_API_KEY`, the flag and the setting (D8).
 
-## DS-2 — JavaScript budget on the marketing pages · 29 Sep 2026 · build sandbox (current checkpoint)
+## DS-2 — JavaScript budget on the marketing pages · 29 Sep 2026 · build sandbox
 
 **Scope:** DS-1 left the marketing pages 0.3–4.0 KB over the design system's budget for
 JavaScript before interaction (§14: under 120 KB gzipped, "React, the router and the page",
@@ -519,4 +519,50 @@ with an E2E assertion.
 those pages' client code will cross it. The design system's Lighthouse CI budgets (§14; Home,
 Work, a case study, Contact, Sign in) on staging (R9), with the real content published, are the
 guard to add.
+
+## A11Y-1 — Targeted accessibility pass · 29 Sep 2026 · build sandbox (current checkpoint)
+
+**Scope:** confirm and fix real keyboard/focus issues only. No redesign, copy, dependency or
+architecture change. Audit: a scripted keyboard pass of the production build, at 1440 px and
+390 px, over Home, Work, a case study, Services, a service page, Our Story, Partners, Careers, a
+role, Contact, Terms, Status, sign-in and a 404. It checked:
+- the first Tab stop is the visible skip link, and the next Tab after it lands in `#main`;
+- a visible indicator on every Tab stop, and an accessible name;
+- one h1 per page, the main/header/footer landmarks, no positive tabindex, no duplicate ids, no
+  `<a>` without href;
+- the mobile menu dialog: Tab and Shift+Tab stay inside, and the page behind is `inert`.
+
+That was followed by the 57-load navigation sweep from DS-2.
+
+| Issue (confirmed) | Fix |
+|---|---|
+| After choosing a page from the **mobile menu dialog**, focus landed on `<body>`, not the new h1. The page changed during the dialog's close, while `#main` was still `inert`, so `h1.focus()` did nothing. Present since DS-1. | `useFocusHeadingOnNavigate` (`app/components/vora/reveal.ts`): if `#main` is inert, it focuses the heading the moment `inert` is lifted, using a `MutationObserver` on that attribute (no timer) and disconnecting on cleanup. The menu's animation, trap, Esc, return-to-Menu on a plain close, and the no-JS `<details>` menu are unchanged. |
+| **No visible focus on individual links** inside `.v-feature`: `.v-feature a:focus-visible { outline: none }` with a ring on the whole card. On the case-study opening, "Work" and "Visit site" shared that one ring, so moving between them showed no change (WCAG 2.4.7). The rule was a DS-1 addition, not in `docs/design-system/components/bundle.css`. | Removed the two `.v-feature` focus rules (`app/styles/vora.css`), so those links get the standard ring (2 px, 3 px offset, §6.1). The stretched single-link cards (`.v-tile`, `.v-next`) keep their card ring. |
+
+**Checked and left alone (correct):**
+- the skip link;
+- `aria-current` on header and menu links, and on the /contact CTA;
+- one h1 and the landmarks on every page (sign-in has no footer by design);
+- the dialog's `aria-modal`/label, focus trap both ways, Esc, `inert` and scroll lock;
+- reduced motion (no reveals armed; the menu still works);
+- no nameless controls.
+
+axe (WCAG 2.2 A/AA) is still clean on every page in the specs.
+
+**Tests run (targeted):**
+- `npm run typecheck`: pass.
+- `npm run lint`: 238 files, pass.
+- `npm run test:unit`: 239/239.
+- Chromium E2E `tests/e2e/design-system.spec.ts` + `tests/e2e/a11y.spec.ts` (desktop + Pixel 7): 34/34. One assertion and one test are new: menu navigation focuses the new h1, and again with reduced motion.
+- Navigation sweep of all 19 marketing pages (desktop, mobile, mobile with reduced motion): 0 problems.
+
+Integration, full E2E, HTTPS, mutation, restore, Docker and clean-room were not re-run: the
+change is two client-only lines of behaviour and one CSS rule.
+
+**Left for later (not confirmed, or larger than this pass):**
+- The Ask VORA panel (a native modal `<dialog>`, off by default) closes on navigation the same
+  way. Whether focus reaches the new h1 after following an answer's source link was not verified
+  here: it needs the assistant switched on.
+- The portal areas were not part of this keyboard pass beyond the existing axe specs.
+- VoiceOver, WebKit and Firefox are unchanged from before: they need human verification.
 

@@ -120,9 +120,24 @@ export function useFocusHeadingOnNavigate(id: string): void {
       root.setAttribute("data-navigated", "");
       return;
     }
-    const heading = root.querySelector<HTMLElement>("h1");
-    if (!heading) return;
-    if (!heading.hasAttribute("tabindex")) heading.setAttribute("tabindex", "-1");
-    heading.focus({ preventScroll: true });
+    const focusHeading = () => {
+      const heading = root.querySelector<HTMLElement>("h1");
+      if (!heading) return;
+      if (!heading.hasAttribute("tabindex")) heading.setAttribute("tabindex", "-1");
+      heading.focus({ preventScroll: true });
+    };
+    if (!root.inert) {
+      focusHeading();
+      return;
+    }
+    // A destination chosen in the menu dialog: the page stays inert (unfocusable) until the
+    // dialog closes, so the heading takes focus the moment `inert` is lifted.
+    const observer = new MutationObserver(() => {
+      if (root.inert) return;
+      observer.disconnect();
+      focusHeading();
+    });
+    observer.observe(root, { attributes: true, attributeFilter: ["inert"] });
+    return () => observer.disconnect();
   }, [id, location.pathname]);
 }

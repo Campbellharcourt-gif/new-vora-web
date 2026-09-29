@@ -82,7 +82,8 @@ Verification states used in reports: **PASS** (actually run and passed) · **FAI
 - [x] VORA AI: grounded public assistant, off by default (flag + setting + server key), allow-listed sources
 - [x] Responsive review (1440 / 390 / 320), axe on every public page, both motion modes, auth and each portal area
 - [x] JavaScript before interaction under 120 KB gzipped on every marketing page (116.1–119.8 KB; DS-2)
-- [ ] Focus after choosing a page from the mobile menu dialog lands on `<body>`, not the new h1 (since DS-1; found in DS-2)
+- [x] Focus after choosing a page from the mobile menu dialog reaches the new h1 (was `<body>` since DS-1; fixed in A11Y-1)
+- [x] Keyboard focus ring on the links inside project features and the case-study opening (was suppressed; fixed in A11Y-1)
 - [!] WebKit / Firefox and a VoiceOver pass — your Mac
 - [!] Open decisions keep their fallbacks: D5 logo (text wordmark), D9 renders (T0 stations), D10 fonts (Archivo/Newsreader/DM Mono), D13 testimonials (off), D18 Design page (part of Websites), D19 Journal (deferred), Motion cookie `vora_motion` (OS setting only), `dominantColor` (basalt-900 placeholder)
 - [!] Copy slots and media: positioning line, invitations per page, leads, service bodies and who-does-what, principle bodies, "what happens next"; case-study captures, covers, service plates; the media delivery route (Phase 5)
