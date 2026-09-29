@@ -5,10 +5,12 @@ import { recordSecurityEvent } from "../observability/security-events";
 export type LimiterName = "RL_AUTH" | "RL_FORMS" | "RL_API" | "RL_AI";
 
 /**
- * Checks a Workers Rate Limiting binding. Keys are derived on the server (hashed client IP or
- * user ID) — never from client-supplied headers. If the binding itself errors we fail OPEN and
- * log loudly: account-level throttles in D1 still protect authentication, and a platform fault
- * must not lock every visitor out.
+ * Checks a rate limiter (on Railway: the in-process sliding-window limiter in
+ * server/platform/rate-limiter.ts, with the Workers binding's limits — auth 20, forms 6, API 120,
+ * AI 12 per 60 s — exact because there is one instance). Keys are derived on the server (hashed
+ * client IP or user ID) — never from client-supplied headers. If the limiter itself errors we fail
+ * OPEN and log loudly: account-level throttles in the database still protect authentication, and
+ * a platform fault must not lock every visitor out.
  */
 export async function checkRateLimit(
   ctx: ServerContext,

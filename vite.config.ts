@@ -1,22 +1,30 @@
-import { cloudflare } from "@cloudflare/vite-plugin";
 import { reactRouter } from "@react-router/dev/vite";
 import { defineConfig } from "vite";
 
+/**
+ * Railway migration §4.2–4.3: a standard React Router Node build. The SSR environment's input is
+ * the Node server entry (server/main.ts), so `build/server/index.js` is the whole server — the ~
+ * and @shared aliases resolve at build time. Development runs Vite in middleware mode inside the
+ * same server (server/dev.ts); the Cloudflare plugin and workerd are gone.
+ */
 export default defineConfig({
-  plugins: [
-    cloudflare({
-      viteEnvironment: { name: "ssr" },
-      // Local D1/R2/KV state. E2E runs point this at a throwaway directory (VORA_LOCAL_STATE).
-      persistState: process.env.VORA_LOCAL_STATE ? { path: process.env.VORA_LOCAL_STATE } : true,
-    }),
-    reactRouter(),
-  ],
+  plugins: [reactRouter()],
   resolve: {
     tsconfigPaths: true,
   },
   build: {
-    // Source maps are uploaded to Cloudflare for the Worker only (upload_source_maps);
-    // browser bundles do not ship source maps publicly.
+    // Browser bundles never ship source maps publicly (and the static file server refuses to
+    // serve .map files even if one appeared).
     sourcemap: false,
+  },
+  environments: {
+    ssr: {
+      build: {
+        // Server source maps stay inside the image (`node --enable-source-maps`), never public.
+        sourcemap: true,
+        target: "node24",
+        rollupOptions: { input: "./server/main.ts" },
+      },
+    },
   },
 });

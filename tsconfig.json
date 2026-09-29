@@ -5,7 +5,7 @@
       "path": "./tsconfig.node.json"
     },
     {
-      "path": "./tsconfig.cloudflare.json"
+      "path": "./tsconfig.app.json"
     }
   ],
   "compilerOptions": {
@@ -17,6 +17,7 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
       "~/*": ["./app/*"],

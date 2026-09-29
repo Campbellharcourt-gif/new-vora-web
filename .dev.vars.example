@@ -1,5 +1,6 @@
 # Local development secrets (copy to .dev.vars — never commit .dev.vars).
-# Staging/production values are set with: npx wrangler secret put <NAME> --env <staging|production>
+# Staging/production values are SEALED Railway variables (docs/railway/variables.md), entered in the
+# Railway dashboard only — never here, never in a shell.
 
 # 32+ random bytes, base64url. Generate: node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 AUTH_SECRET=
@@ -12,7 +13,7 @@ RESEND_WEBHOOK_SECRET=
 
 # Cloudflare Turnstile secret. Leave empty locally to skip verification (logged), or use
 # Cloudflare's public "always passes" TEST secret 1x0000000000000000000000000000000AA together
-# with the test site key already set in wrangler.jsonc. Required in staging/production.
+# with the test site key the local defaults set (server/local-env.ts). Required in staging/production.
 TURNSTILE_SECRET_KEY=
 
 # Gemini (server-side only; never exposed to the browser)

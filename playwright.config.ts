@@ -1,9 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * End-to-end tests against the PRODUCTION BUILD running in workerd (`vite preview`), with a
- * throwaway local database (migrated, seeded, one dev user per role). Nothing here touches a
- * remote Cloudflare resource.
+ * End-to-end tests against the PRODUCTION BUILD running on Node (build/server/index.js), with a
+ * throwaway local SQLite database (migrated, seeded, one dev user per role). Nothing here touches
+ * a remote resource (Railway, Cloudflare, Resend).
  *
  *   npm run test:e2e
  *

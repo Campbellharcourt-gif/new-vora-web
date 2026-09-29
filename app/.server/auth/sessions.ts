@@ -1,6 +1,6 @@
 import { and, eq, gt, isNull, ne } from "drizzle-orm";
 import type { ServerContext } from "../context";
-import { schema } from "../db/client";
+import { affectedRows, schema } from "../db/client";
 import { readCookie, serializeCookie } from "../lib/cookies";
 import { hmacHex, randomToken, sha256Hex } from "../lib/crypto";
 import { DAY, HOUR, MINUTE } from "../lib/time";
@@ -210,7 +210,7 @@ export async function revokeSession(
     .set({ revokedAt: ctx.clock.now(), revokedReason: reason })
     .where(and(eq(schema.sessions.id, sessionId), isNull(schema.sessions.revokedAt)))
     .run();
-  return (result.meta.changes ?? 0) > 0;
+  return affectedRows(result) > 0;
 }
 
 /** Revokes every live session for a user, optionally keeping the current one. Returns the count. */
@@ -227,7 +227,7 @@ export async function revokeUserSessions(
     .set({ revokedAt: ctx.clock.now(), revokedReason: reason })
     .where(and(...conditions))
     .run();
-  return result.meta.changes ?? 0;
+  return affectedRows(result);
 }
 
 export async function listActiveSessions(ctx: ServerContext, userId: string) {

@@ -1,0 +1,31 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    ".react-router/types/**/*",
+    "app/**/*",
+    "app/**/.server/**/*",
+    "app/**/.client/**/*",
+    "shared/**/*",
+    "server/**/*",
+    "tests/unit/**/*",
+    "tests/integration/**/*",
+    "tests/support/**/*",
+    "scripts/lib/s3-mock.ts"
+  ],
+  "compilerOptions": {
+    "composite": true,
+    "lib": ["DOM", "DOM.Iterable", "ES2024"],
+    "types": ["vite/client", "node"],
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "rootDirs": [".", "./.react-router/types"],
+    "paths": {
+      "~/*": ["./app/*"],
+      "@shared/*": ["./shared/*"]
+    },
+    "resolveJsonModule": true,
+    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/app.tsbuildinfo"
+  }
+}

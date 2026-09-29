@@ -1,0 +1,19 @@
+# Never in the build context: dependencies, build output, local state, secrets, exports, VCS.
+node_modules
+build
+.react-router
+.git
+.vora
+.wrangler
+backups
+test-results
+playwright-report
+blob-report
+coverage
+*.log
+.DS_Store
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+!.dev.vars.example

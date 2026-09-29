@@ -2,10 +2,6 @@ import type { WorkerEnv } from "~/.server/config/env";
 import { appContext } from "~/.server/context";
 import { createKernel } from "~/.server/kernel/app";
 
-// wrangler.jsonc binds PASSWORD_HASHER to a class in the main module, so the test entry exports it
-// too (CP-3 · Free plan). Integration tests therefore hash through the real Durable Object.
-export { PasswordHasher } from "~/.server/auth/password-hasher";
-
 /**
  * Test entry: the production kernel (headers, CSRF, sessions, maintenance, API) with a stub page
  * renderer standing in for React Router. The stub echoes what the kernel resolved so tests can
@@ -23,4 +19,4 @@ export default {
   fetch(request: Request, env: WorkerEnv, ctx: ExecutionContext) {
     return kernel.fetch(request, env, ctx);
   },
-} satisfies ExportedHandler<WorkerEnv>;
+};

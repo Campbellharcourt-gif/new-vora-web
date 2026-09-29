@@ -1,0 +1,16 @@
+# Litestream 0.5 — continuous replication of the SQLite database to the environment's PRIVATE R2
+# backups bucket (Railway migration §6.9, layer 1). Values come from the environment at run time
+# (docker/entrypoint.sh): DATABASE_PATH, R2_ACCOUNT_ID, R2_BUCKET_BACKUPS; the credentials are read
+# by Litestream from LITESTREAM_ACCESS_KEY_ID / LITESTREAM_SECRET_ACCESS_KEY (set from the sealed
+# R2 variables). No secret is ever written here.
+#
+# Against real R2 this is NOT VERIFIED until staging (docs/runbooks/backup-and-recovery.md).
+dbs:
+  - path: ${DATABASE_PATH}
+    replica:
+      type: s3
+      bucket: ${R2_BUCKET_BACKUPS}
+      path: vora.db
+      endpoint: https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com
+      region: auto
+      force-path-style: true

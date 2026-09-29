@@ -45,6 +45,45 @@ export async function checkDatabase(ctx: ServerContext): Promise<ComponentHealth
   }
 }
 
+export interface LiveHealth {
+  ok: boolean;
+  database: "ok" | "down";
+  migrations: "complete" | "incomplete" | "unknown";
+  foreignKeys: "on" | "off" | "unknown";
+}
+
+/**
+ * Railway's deploy health check (`/api/health/live`, migration §4.8): only the process, the
+ * database and that every shipped migration is applied — never R2, email or AI, so a provider
+ * blip cannot block a deploy. It also refuses to report healthy if foreign-key enforcement is off.
+ * Returns states only; nothing internal.
+ */
+export async function checkLive(ctx: ServerContext): Promise<LiveHealth> {
+  const out: LiveHealth = {
+    ok: false,
+    database: "down",
+    migrations: "unknown",
+    foreignKeys: "unknown",
+  };
+  try {
+    await ctx.env.DB.prepare("select 1 as ok").first();
+    out.database = "ok";
+    const fk = await ctx.env.DB.prepare("PRAGMA foreign_keys").first<{ foreign_keys: number }>();
+    out.foreignKeys = Number(fk?.foreign_keys) === 1 ? "on" : "off";
+    const expected = ctx.env.MIGRATIONS ?? [];
+    const rows = await ctx.env.DB.prepare("select name from d1_migrations").all<{ name: string }>();
+    const applied = new Set(rows.results.map((r) => r.name));
+    out.migrations =
+      expected.length > 0 && expected.every((name) => applied.has(name))
+        ? "complete"
+        : "incomplete";
+  } catch (error) {
+    ctx.log.error("health_live_failed", describeError(error));
+  }
+  out.ok = out.database === "ok" && out.migrations === "complete" && out.foreignKeys === "on";
+  return out;
+}
+
 export async function checkStorage(ctx: ServerContext): Promise<ComponentHealth> {
   try {
     const { ms } = await timed(async () => {

@@ -1,0 +1,9 @@
+# LOCAL REHEARSALS ONLY: the same replication as litestream.yml, to a directory instead of R2, so
+# replicate → restore can be rehearsed with the real Litestream binary and no cloud account
+# (scripts/restore-rehearsal.ts, scripts/docker-rehearsal.ts). Selected with
+# LITESTREAM_CONFIG=/app/docker/litestream.file.yml.
+dbs:
+  - path: ${DATABASE_PATH}
+    replica:
+      type: file
+      path: ${LITESTREAM_FILE_REPLICA}

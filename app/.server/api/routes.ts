@@ -5,7 +5,7 @@ import { authorize } from "../auth/rbac";
 import type { KernelEnv } from "../kernel/types";
 import { errors } from "../lib/errors";
 import { submitEnquiry } from "../services/enquiries";
-import { checkDatabase, publicHealth, systemHealth } from "../services/health";
+import { checkDatabase, checkLive, publicHealth, systemHealth } from "../services/health";
 import { apiError, readJson } from "./respond";
 
 /**
@@ -17,6 +17,21 @@ export function createApi() {
 
   // --- Health (public, minimal) -----------------------------------------------------------
   api.get("/health", (c) => c.json({ status: "ok" }, 200, { "Cache-Control": "no-store" }));
+
+  // Railway's deploy health check: process + database + migrations only (never R2 or email).
+  api.get("/health/live", async (c) => {
+    const live = await checkLive(c.get("server"));
+    return c.json(
+      {
+        status: live.ok ? "live" : "unavailable",
+        database: live.database,
+        migrations: live.migrations,
+        foreignKeys: live.foreignKeys,
+      },
+      live.ok ? 200 : 503,
+      { "Cache-Control": "no-store" },
+    );
+  });
 
   api.get("/health/ready", async (c) => {
     const db = await checkDatabase(c.get("server"));

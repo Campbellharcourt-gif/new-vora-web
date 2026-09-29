@@ -1,27 +1,33 @@
 import { isTurnstileTestKey } from "@shared/turnstile";
 import { z } from "zod";
-import type { PasswordHasher } from "../auth/password-hasher";
 import { AppError } from "../lib/errors";
+import type { DevMailbox, ObjectStorage, RateLimiter, SqlDatabase } from "../platform/types";
 
 /**
- * Everything the Worker receives from Cloudflare: bindings (wrangler.jsonc), plain vars and
- * secrets (`wrangler secret put` / `.dev.vars`). Secrets are only ever read on the server.
+ * Everything the application receives from its platform: services (database, storage, rate
+ * limiters, dev mailbox) and the plain variables and secrets it reads. On Railway the Node server
+ * builds this object at start-up (`server/platform/env.ts`) from the service's variables — secrets
+ * are sealed Railway variables, locally `.dev.vars`. Secrets are only ever read on the server.
+ *
+ * The name is historic (Workers); the shape is the platform-neutral one. Platform-only secrets
+ * (the origin-auth secret, R2 credentials) are deliberately not part of it: the application never
+ * needs them.
  */
 export interface WorkerEnv {
-  DB: D1Database;
-  MEDIA: R2Bucket;
-  PRIVATE: R2Bucket;
-  RL_AUTH: RateLimit;
-  RL_FORMS: RateLimit;
-  RL_API: RateLimit;
-  RL_AI: RateLimit;
-  /**
-   * Argon2id runs in this Durable Object (CP-3 · Cloudflare Free — auth/password-hashing.ts).
-   * Bound in every wrangler.jsonc environment; absent only where a test builds its own env.
-   */
-  PASSWORD_HASHER?: DurableObjectNamespace<PasswordHasher>;
+  DB: SqlDatabase;
+  MEDIA: ObjectStorage;
+  PRIVATE: ObjectStorage;
+  RL_AUTH: RateLimiter;
+  RL_FORMS: RateLimiter;
+  RL_API: RateLimiter;
+  RL_AI: RateLimiter;
   /** Development/test only — absent in staging and production. */
-  DEV_MAILBOX?: KVNamespace;
+  DEV_MAILBOX?: DevMailbox;
+  /**
+   * Names of the migration files shipped with this build. The server applies them all before it
+   * listens; `/api/health/live` checks the ledger still lists every one.
+   */
+  MIGRATIONS?: readonly string[];
 
   APP_ENV: string;
   APP_ORIGIN: string;
@@ -143,8 +149,9 @@ const schema = z
 const cache = new WeakMap<object, AppConfig>();
 
 /**
- * Validates the environment once per isolate. Invalid configuration fails closed: the kernel
- * turns this error into a generic 503 and logs which keys are wrong (never their values).
+ * Validates the environment once per env object (the Node server builds one at start-up and also
+ * refuses to start when this throws). Invalid configuration fails closed: the kernel turns this
+ * error into a generic 503 and logs which keys are wrong (never their values).
  */
 export function getConfig(env: WorkerEnv): AppConfig {
   const cached = cache.get(env);

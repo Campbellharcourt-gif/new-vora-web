@@ -323,3 +323,64 @@ removed.
   isolate ~70–80 ms — against 10 ms); whether the Rate Limiting binding is available on Free; the
   account's existing cron-trigger count; whether Zero Trust sign-up asks for a payment method.
 - WebKit and Firefox were not re-run: the CP-3 changes are server-side only.
+
+
+## RW-1 — Railway migration R1–R7 · 29 Sep 2026 · build sandbox (current checkpoint)
+
+**Baseline:** CP-3 Free (`vora-cp3-cloudflare-free.zip`, SHA-256 `b8127146…59281dd`, 224 files),
+imported unchanged as commit `5b67c21`, plus the design-system/Railway docs patch (`37f1a75`). The
+CP-2.1 skip-link fix is part of CP-3 (the patch reverse-applies cleanly). Plan:
+`VORA-RAILWAY-MIGRATION.md`. **Nothing was deployed, purchased or created** — no Railway project,
+no Cloudflare/R2 resource, no DNS change, no secret read or rotated, no data migrated.
+
+### Baseline re-run (CP-3 as received, Node 22.22.2, workerd)
+
+| Suite | Result |
+|---|---|
+| `npm run verify` (typecheck · lint 201 files · unit+tooling · integration in workerd · build) | PASS — 200/200 · 124/124 |
+| E2E Chromium · HTTPS production mode · security scan | 83/83 · 7/7 · no findings |
+
+### What changed (R1–R7)
+
+| Stage | Change |
+|---|---|
+| R1 runtime | Node 24.21.0; `server/main.ts` (bundled into `build/server/index.js`), `server/runtime.ts` (start-up → listen → SIGTERM drain), `server/dev.ts` (Vite middleware mode); static files from `build/client` (hashed = immutable, `nosniff`, no maps, no traversal); logs one JSON line with `message`/`level`; Cloudflare Vite plugin, Wrangler, `worker-configuration.d.ts`, `workers/app.ts`, `public/_headers` removed |
+| R2 Argon2id | `crypto.argon2` (native, libuv pool), identical parameters/NFKC/PHC; byte-identical to `@noble/hashes` (now a dev dependency, used only for cross-checks); start-up known-answer self-test; ≤ 4 concurrent, queue 32, 10 s → 503 with nothing recorded; the PasswordHasher Durable Object removed only after its replacement passed |
+| R3 database | libSQL on a volume file: `foreign_keys=ON` (also the compile-time default), WAL, `synchronous=NORMAL`, busy timeout, one connection; D1-shaped facade; migrations at start-up (same 3 files, same `d1_migrations` ledger, one transaction per file, `VACUUM INTO` snapshot first, last 3 kept); 11 `meta.changes` → `affectedRows()` |
+| R4 platform services | R2 over S3 (aws4fetch, no bucket creation); in-process sliding-window limiters (20/6/120/12 per 60 s); background-task tracker; UTC scheduler (croner, no overlap); dev mailbox in memory; `EMAIL_RETRY_BATCH` 10 → 25; `/api/health/live` |
+| R5 trust | `X-Vora-Origin-Auth` required in staging/production (constant-time; refused 403; server refuses to start without a 32+ secret); Cloudflare headers trusted only behind it (dev: replaced by the socket address); URL rebuilt from `APP_ORIGIN` (Host/X-Forwarded-* ignored); Access JWT validation (RS256, audience, issuer, validity; keys unavailable → 503) |
+| R6 tests | integration suite on Node with `cloudflare:test`/`cloudflare:workers` aliased to the real adapters (13 files unchanged); E2E on three Node servers and HTTPS behind a local Cloudflare stand-in (specs unchanged); Cloudflare-only tests replaced one by one (`docs/railway/TEST-MAPPING.md`, D23) |
+| R7 image | root `Dockerfile` (Node 24.21.0 and Litestream 0.5.17 pinned by digest, non-root, read-only app, `node` started directly); `docker/entrypoint.sh` (restore on empty volume, `litestream replicate -exec`, refuses staging/production without backups); `litestream.yml` (R2); rehearsal scripts |
+
+### Results (Node 24.21.0 — after the last code change)
+
+| Suite | Result |
+|---|---|
+| typecheck · lint (226 files) · build | PASS |
+| Unit + tooling | 239/239, 20 files |
+| Integration (Node, real adapters) | 152/152, 17 files — the 13 unchanged CP-3 files (117 tests) + native hashing (9) + SQLite platform (14) + server lifecycle (8) + CLI (4) |
+| E2E Chromium (desktop + Pixel 7), production build on Node | 83/83 — spec files byte-identical to CP-3 |
+| E2E HTTPS production mode (behind a local Cloudflare stand-in) | 7/7 — spec byte-identical |
+| `security:scan` | no findings (335 committable files, 59 bundle files) |
+| Mutation check (`scripts/mutation-check.ts`) | 20/20 caught — CP-3's seven restated + FK off (guard / no guard), origin auth off, any secret accepted, forged client IP, Host-derived URL, Access audience, Argon2 self-test, limiter off-by-one, scheduler overlap, non-atomic migration, public maps, shutdown without draining |
+| Restore rehearsal (`npm run db:restore-rehearsal`, Litestream 0.5.17, file replica) | PASS — 37 passed, 0 failed: activity via the production build under `litestream replicate -exec`; Litestream restore and `VACUUM INTO` snapshot each identical to the source (55 tables incl. Litestream's two, 266 rows, schema SQL, SHA-256 per table, `integrity_check` ok, 0 FK violations, triggers refuse); Owner signs in on the restored database with a pre-backup recovery code |
+| Docker image build | PASS (in this sandbox with the proxy CA as a BuildKit secret — never in a layer) |
+| Docker rehearsal (`scripts/docker-rehearsal.ts`) | PASS — 25/25: non-root, read-only app, Node 24.21.0/OpenSSL 3.5.8/argon2, Litestream v0.5.17, no secrets/public maps; refuses to start without the origin secret, with a Turnstile test key, without backups; origin auth at the socket; HSTS/CSP; CSRF over plain HTTP; in-container seed/integrity; `docker stop` → exit 0 (clean drain); restart without re-migrating; restore on an EMPTY volume from the replica (53 tables identical); failing migration → exit 1, snapshot kept, nothing applied |
+| `npm run deploy:check` | PASS — the image validates both templates with real-shaped values and refuses both without `ORIGIN_AUTH_SECRET` |
+| Checkpoint integrity | uploaded ZIPs, patches and documents: SHA-256 unchanged; the CP-3 reference copy still 224 files |
+
+### Still NOT VERIFIED (needs Railway, Cloudflare or your Mac)
+
+- **Railway:** build and deploy from Git, the volume, `RAILWAY_DEPLOYMENT_DRAINING_SECONDS`, the
+  deploy health check, logs in the dashboard, `railway ssh` for the operator commands, the
+  Singapore region's latency, cost.
+- **Cloudflare:** the origin-auth and ASN Transform Rules, the location headers, SSL mode Full,
+  certificate issuance while proxied, Access with a real team and JWT keys, WAF/Bot Fight Mode
+  with Resend webhooks.
+- **R2:** real signing (the adapter's SigV4 is verified against an independent implementation
+  and a local mock), Litestream replication to R2 (rehearsed with a file replica).
+- **Resend, Turnstile, Gemini** live — unchanged code, never exercised against the providers here.
+- **WebKit and Firefox** runs — only Chromium exists in this sandbox (`playwright install` is not
+  permitted): `npx playwright install webkit firefox && npm run test:e2e:browsers &&
+  npm run test:e2e:https:browsers` on your Mac.
+- **Docker on your Mac:** `npm run docker:build && npx tsx scripts/docker-rehearsal.ts --image vora-web:local`.

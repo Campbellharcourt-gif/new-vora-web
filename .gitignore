@@ -8,7 +8,9 @@ dist/
 coverage/
 *.tsbuildinfo
 
-# Cloudflare / Wrangler local state and secrets
+# Local state (development database, rehearsals) and secrets. `.wrangler/` is kept only as the
+# E2E harness's state directory (the specs read their credentials from it).
+.vora/
 .wrangler/
 .dev.vars
 .dev.vars.*

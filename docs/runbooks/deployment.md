@@ -1,308 +1,140 @@
-# Runbook — Environments, first deployment and cutover
+# Runbook — Environments, first deployment and cutover (Railway)
 
-Status: **written, not yet executed.** Nothing in this runbook has been run against your Cloudflare
-account from the build environment (no Wrangler login there). Every step is marked with who runs
-it. Commands are for macOS (zsh) from the project root. CP-2.1 applied the corrections from the
-CP-3 readiness review (P5 items 1–9) and added the deploy guards H1–H4 described in §2, §3 and §5.
+VORA runs as **one Node.js service on Railway** behind **Cloudflare** (DNS, TLS, WAF, cache,
+Turnstile, R2, Access for staging). Architecture and reasons: `docs/VORA-RAILWAY-MIGRATION.md`.
+Every variable: `docs/railway/variables.md`.
 
-Environments (see `wrangler.jsonc`):
+> **Status: nothing here has been done.** No Railway project, Cloudflare resource, bucket,
+> token, DNS record or secret exists for this build. Every step below is yours, happens only
+> after your explicit approval (checkpoint **R8**), and is **NOT VERIFIED** until staging proves it
+> (checkpoint **R9**). The production cutover (**R10**) is a separate approval.
 
-| | Local | Staging | Production |
-|---|---|---|---|
-| Worker | `vite dev` / `vite preview` (workerd) | `vora-web-staging` | `vora-web` |
-| Hostname | `http://localhost:5173` | `staging.vorawebsites.store` (behind Cloudflare Access) | `vorawebsites.store` (attached at cutover) |
-| D1 | local Miniflare | `vora-staging` | `vora-production` |
-| R2 | local | `vora-media-staging`, `vora-private-staging` | `vora-media`, `vora-private` |
-| Email | capture (dev mailbox) | Resend | Resend |
+Rules that never change:
 
----
+- Secrets are **sealed** Railway variables, entered in the dashboard's variable editor — never in
+  a shell command, a chat, a file or a commit.
+- Staging first, always. Production gets exactly what staging proved.
+- Mark4 (the live site, its Railway project and the `vora-websites-mark2` proxy Worker) is never
+  modified until the approved cutover, and is kept for 14 days after it.
 
-## 0. Prerequisites (once)
+## 0. Decisions and limits first
 
-1. **Cloudflare plan** — read `docs/CLOUDFLARE-FREE-COMPATIBILITY.md` first. Since the CP-3 Free
-   audit, Argon2id (~250 ms of CPU per hash) runs in the `PasswordHasher` Durable Object and
-   `wrangler.jsonc` no longer sets `limits.cpu_ms` (a Free account refuses any deploy that does),
-   so the configuration deploys on Workers Free. The Worker's own CPU for sign-in, the email-code
-   step and the portals was still measured at 2–4× the Free plan's 10 ms, so on Free expect
-   Error 1102 on those pages until Cloudflare's CPU telemetry shows otherwise (report §9).
-   Workers Paid removes that limit; nothing else in this runbook changes with the plan.
-2. Node 22.22+ and npm. Then:
+| # | Decision | Recommendation (migration plan §12.4) |
+|---|---|---|
+| D20 | Railway plan (Hobby is a purchase) | Hobby; **hard spending limit** ≈ $20/month and an email alert at $10, set *before* the first deploy |
+| D21 | Region | Singapore (`asia-southeast1`), the nearest to Australia |
+| D22 | Staging protection | Cloudflare Access (named emails only) + origin JWT check + origin-auth header |
+| D24 | Database | SQLite on a volume + Litestream to R2 (PostgreSQL deferred) |
+| D12 | Mark4 data | Unchanged question — nothing is migrated without an export and a written mapping |
 
-   ```sh
-   npm ci
-   npx wrangler login          # opens the browser; choose the account that owns vorawebsites.store
-   npx wrangler whoami         # confirm the account name and ID
-   ```
+## 1. Cloudflare (you, dashboard — per environment)
 
-3. Local sanity check (must pass before anything is deployed):
+1. **R2 buckets** (all private): `vora-media-staging`, `vora-private-staging`,
+   `vora-backups-staging` (production: `vora-media`, `vora-private`, `vora-backups`). The
+   application never creates buckets.
+2. **R2 API token** per environment: *Object Read & Write*, scoped to that environment's three
+   buckets only. Keep the Access Key ID and Secret for step 3 (sealed variables).
+3. **Turnstile** widget per environment (hostname = the environment's hostname). The site key is
+   a plain variable, the secret a sealed one. Test keys are refused at start-up.
+4. **Transform Rules** (Rules → Transform Rules → Modify Request Header), on the environment's
+   hostname only:
+   - set `X-Vora-Origin-Auth` = a new random value of ≥ 32 characters
+     (`openssl rand -base64 48`, pasted straight into the rule and into Railway's sealed
+     `ORIGIN_AUTH_SECRET` — nowhere else);
+   - set `X-Vora-ASN` = `to_string(ip.src.asnum)`;
+   - Managed Transforms → **Add visitor location headers** on.
+5. **Access (staging only)**: an application for `staging.vorawebsites.store` with a policy naming
+   approved email addresses only (never "Everyone"). Note the team domain and the application
+   **AUD** tag → `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`.
+6. **SSL/TLS mode: Full** (Railway documents Full (strict) as not working behind its edge).
+   Always Use HTTPS on; minimum TLS 1.2. HSTS is sent by the application.
+7. **Bot Fight Mode stays off** until tested against the Resend webhooks.
 
-   ```sh
-   npm run verify              # typegen + typecheck, lint, unit + integration tests, build
-   npm run test:e2e            # production build in workerd + Playwright (needs: npx playwright install chromium)
-   npm run test:e2e:https      # production mode over local HTTPS: __Host- cookies, HSTS
-   ```
+## 2. Railway (you, dashboard)
 
-   Before a release, also run the Safari engine (WebKit) and Firefox: `npx playwright install
-   webkit firefox` once, then `npm run test:e2e:browsers` and `npm run test:e2e:https:browsers`.
+1. A **new project** `vora` (never the Mark4 project), environments `staging` and `production`,
+   region per D21.
+2. Service **`web`** from this repository's branch; Railway builds the root `Dockerfile`
+   (no `railway.json` — config-as-code is deprecated and would bypass review).
+3. **Volume** mounted at `/data` (one replica only — a volume allows no replicas).
+4. **Variables**: every entry of `config/railway.<env>.env.example` — plain values as they are
+   there, sealed values entered with *Seal* on. `docs/railway/variables.md` explains each.
+5. **Settings**: health check path `/api/health/live` (checks process, database, migrations —
+   never R2 or email); `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=30`; restart policy *on failure*.
+6. **Networking**: do **not** generate a `*.up.railway.app` domain. Add the custom domain
+   (`staging.vorawebsites.store`) and create the DNS records Railway shows (proxied CNAME + TXT)
+   in Cloudflare. If the certificate is not issued while proxied, switch the record to DNS-only
+   until it is, then back (staging first).
+7. **Spending limit** and alert (D20) — before the first deploy.
 
-## 1. Create Cloudflare resources (you run — once per environment)
+## 3. Deploy (Railway builds and starts the image)
 
-Oceania (`oc`) location hints keep data close to Australian users. Change them only if you
-decide otherwise.
-
-```sh
-# Staging
-npx wrangler d1 create vora-staging --location oc --update-config=false
-npx wrangler r2 bucket create vora-media-staging --location oc --update-config=false
-npx wrangler r2 bucket create vora-private-staging --location oc --update-config=false
-
-# Production
-npx wrangler d1 create vora-production --location oc --update-config=false
-npx wrangler r2 bucket create vora-media --location oc --update-config=false
-npx wrangler r2 bucket create vora-private --location oc --update-config=false
-
-# Long-term database exports (see backup-and-recovery.md)
-npx wrangler r2 bucket create vora-backups --location oc --update-config=false
-
-npx wrangler r2 bucket list                     # check every bucket exists before any deploy
-```
-
-`--update-config=false` matters. Without it, Wrangler 4.141 asks "Would you like Wrangler to add
-it on your behalf?" with **Yes** as the default and, without `--env`, writes the new database or
-bucket into the top-level **local** configuration. If you still see that question, answer **n**.
-
-Create every database and bucket **before** the first deploy. The deploy scripts run
-`wrangler deploy --experimental-provision=false` (§5), so a missing database or bucket makes the
-deploy fail instead of being created silently (without the Oceania location hint).
-
-Copy each `database_id` printed by `d1 create` into `wrangler.jsonc`, replacing
-`REPLACE_WITH_STAGING_D1_ID` and `REPLACE_WITH_PRODUCTION_D1_ID`; the pre-deploy check (§5)
-refuses to upload while a placeholder remains or the ID is not a UUID. Do **not** create KV for
-`DEV_MAILBOX` in staging or production — it is intentionally absent there.
-
-## 2. Third-party services (you run — dashboards)
-
-**Turnstile** (Cloudflare dashboard → Turnstile → Add widget):
-- `VORA staging` — hostname `staging.vorawebsites.store`, managed mode.
-- `VORA production` — hostname `vorawebsites.store`. A hostname entry also covers its
-  subdomains (so `www.` and `next.` are included; at most 10 hostnames per widget).
-- Put each **site key** into `wrangler.jsonc` (`TURNSTILE_SITE_KEY`, replacing the
-  `REPLACE_WITH_…` placeholder — config validation refuses to start with a placeholder).
-  The **secret key** goes in as a secret (step 3).
-- Never use Cloudflare's Turnstile **test keys** (`1x00000000000000000000AA` and the like)
-  outside local development: staging and production refuse to start with a test site key or
-  secret (CP-2.1 H1), and the pre-deploy check refuses to upload a test site key.
-
-**Resend** (resend.com → Domains → Add Domain):
-- Domain `vorawebsites.store`, region **Tokyo (ap-northeast-1)** — the closest of Resend's
-  regions. Changing the region later means deleting and re-adding the domain.
-- Leave the custom return path at `send`. Keep **open tracking, click tracking and receiving
-  off**: click tracking rewrites the links in sign-in and password-reset emails, and receiving
-  adds another MX.
-- In Cloudflare DNS add exactly the **3 records** Resend lists, copying the values from its
-  screen: `MX send` (priority 10), `TXT send` (SPF) and `TXT resend._domainkey` (DKIM). Don't
-  use Resend's automatic "Sign in to Cloudflare" setup, and don't change the apex `MX` records
-  (Cloudflare Email Routing) or the apex SPF record. Wait for **Verified**.
-- **Do not add a DMARC record** (skip the DMARC row Resend shows). One already exists
-  (`p=none`, with Cloudflare reporting), and a second DMARC record breaks DMARC.
-- Create an API key with **Sending access** for this domain only (a different key per
-  environment).
-- Senders used: `hello@` (default), `projects@` (enquiry notifications), `careers@` (later).
-  Make sure these mailboxes receive mail.
-
-**Gemini** (Google AI Studio → API keys): create a key restricted to the Generative Language
-API. VORA AI stays **off** (setting + feature flag) until content is final, so this can wait.
-
-**Cloudflare Access** for staging (Zero Trust → Access → Applications → Add → Self-hosted):
-application domain `staging.vorawebsites.store`, policy *Allow* → *Emails* → your address(es).
-Do this **before** the first staging deploy.
-
-## 3. Secrets (you run — per environment)
-
-Generate strong values locally; never paste them into files or chat. Paste each value at
-Wrangler's hidden prompt.
-
-- **Always** pass `--env staging` or `--env production`, and never combine `--name` with `--env`.
-- **Never** pipe a value in (`echo … | npx wrangler secret put …`) and never run with `CI=true`:
-  Wrangler then answers "yes" to creating Workers by itself, so a missing `--env` would silently
-  create `vora-web-local`.
-- The first `secret put` of an environment asks whether to create the Worker: answer **y** for
-  `vora-web-staging` (or `vora-web`) — it creates an empty placeholder Worker that only holds the
-  secrets, and the first deploy replaces it. If a prompt mentions **vora-web-local**, answer
-  **n**: `--env` is missing.
+Before merging a change for deployment, locally:
 
 ```sh
-openssl rand -base64 48          # use once for AUTH_SECRET
-openssl rand -base64 32          # use once for SETUP_TOKEN
-
-npx wrangler secret put AUTH_SECRET --env staging
-npx wrangler secret put SETUP_TOKEN --env staging
-npx wrangler secret put RESEND_API_KEY --env staging
-npx wrangler secret put TURNSTILE_SECRET_KEY --env staging
-npx wrangler secret put GEMINI_API_KEY --env staging          # optional until AI is enabled
-# RESEND_WEBHOOK_SECRET is added when the webhook endpoint ships (Phase 5).
-
-# Repeat with --env production (different values for every secret).
-npx wrangler secret list --env staging                        # names only — values are never shown
+npm run verify            # typecheck, lint, unit + integration, build
+npm run test:e2e          # Chromium; add test:e2e:browsers on your Mac
+npm run test:e2e:https    # production mode over HTTPS behind a local Cloudflare stand-in
+npm run deploy:check      # build → security scan → the IMAGE validates both environment templates
 ```
 
-`AUTH_SECRET`, `RESEND_API_KEY` and `TURNSTILE_SECRET_KEY` are declared as **required** in
-`wrangler.jsonc` (`secrets.required` in `env.staging` and `env.production`, CP-2.1 H3). Set them
-**before the first deploy**: Wrangler refuses to deploy a new Worker without them, and the
-Cloudflare API refuses to update an existing one while one is missing. `SETUP_TOKEN`,
-`GEMINI_API_KEY`, `RESEND_WEBHOOK_SECRET` and `AUTH_SECRET_PREVIOUS` are optional and not declared.
+On start the container: restores the database from the R2 replica if the volume is empty →
+runs the server under Litestream → the server validates configuration (refusing unsafe values),
+opens SQLite (foreign keys, WAL), snapshots and applies pending migrations, runs the Argon2id
+self-test, then listens. Any failure exits non-zero and the health check keeps the deploy from
+going live.
 
-`AUTH_SECRET_PREVIOUS` is only used during a key rotation (see `operations.md`).
+## 4. Base data and the first Owner (once per environment)
 
-## 4. Database: migrate and seed (you run)
+Inside the service (`railway ssh`, select the service — NOT VERIFIED):
 
 ```sh
-npm run db:migrate:staging        # wrangler d1 migrations apply DB --env staging --remote
-npm run db:seed:staging           # roles, permissions, socials, partner + DRAFT content only
+node build/server/index.js seed        # roles, permissions, DRAFT content (idempotent)
 ```
 
-Production (both commands ask you to type `production` first):
+Then:
 
-```sh
-npx wrangler d1 time-travel info vora-production --env production   # record the bookmark first
-npm run db:migrate:production
-npm run db:seed:production
-```
+1. Set `SETUP_TOKEN` (sealed, 24+ characters) and redeploy.
+2. Open `https://staging.vorawebsites.store/setup` (Access asks you to sign in first), enter the
+   token, your name, email and a strong password. **Save the 10 recovery codes offline.**
+3. Delete `SETUP_TOKEN` and redeploy (`/setup` already answers 404 once an Owner exists).
+4. Invite the others from the admin; keep **two** Owners.
 
-Migrations in this repository are **expand-only** (new tables/columns/triggers). Anything
-destructive (dropping or rewriting data) is never run by these scripts: it needs a written plan,
-a fresh export (`npm run backup:export -- --env production --upload`) and a manual run.
+## 5. Smoke test (after every deploy)
 
-## 5. Deploy (you run)
+- `/api/health/live` → `{"status":"live",…}`; `/status` lists components; `/admin/system` shows
+  database and storage *Operational* and 3 migrations applied.
+- **Origin protection:** a request that bypasses Cloudflare is refused — from your Mac,
+  `curl -sI --resolve staging.vorawebsites.store:443:<Railway edge IP> https://staging.vorawebsites.store/`
+  must answer **403** (no origin-auth header).
+- **Client IP:** sign in and check *Account → Security*: the location is yours (proves
+  `CF-Connecting-IP` and the location headers arrive through Cloudflare).
+- Sign out and in: the 6-digit code arrives (Resend end to end). Submit `/contact`: the enquiry
+  appears in `/admin/enquiries`; both emails arrive.
+- Headers: `Strict-Transport-Security`, a CSP with a nonce, `__Host-vora_session` (Secure,
+  HttpOnly, SameSite=Lax), `/assets/*` immutable + `nosniff`, `/api/dev/mailbox` → 404.
+- Logs (Railway → service → Logs): one JSON line per entry with `level` and `message`; every
+  response's `X-Request-Id` appears in its log lines.
+- Backups: the `vora-backups-<env>` bucket receives Litestream files within a minute of a write.
 
-```sh
-npm run verify                    # must pass
-npm run test:e2e                  # must pass (includes the security suite)
-npm run deploy:staging:dry-run    # optional: every step except the upload
-npm run deploy:staging            # build → security scan → pre-deploy check → wrangler deploy
-```
+## 6. Production cutover from Mark4 (separate approval — R10)
 
-Each `deploy:*` script runs, in order, stopping at the first failure:
+1. Staging has passed §5 and a restore drill (`backup-and-recovery.md` §4).
+2. Deploy production (no custom domain yet); attach a temporary protected hostname
+   (e.g. `next.vorawebsites.store` behind Access) and run §5 there. Turnstile and email links
+   are bound to the apex, so forms fail on `next.` by design — test them on staging.
+3. D12: decide about Mark4 data; nothing is migrated without an export and a written mapping.
+4. Cutover window: point the apex `vorawebsites.store` (proxied CNAME) at the production service's
+   custom-domain target; add a **Redirect Rule** `www` → apex (301, path and query kept). Legacy
+   Mark4 URLs are 301-redirected by the application from the first request.
+5. Keep Mark4 and `vora-websites-mark2` untouched for **14 days** (rollback = point DNS back).
+6. Remove the temporary hostname and its Access application.
 
-1. the build for that environment (`CLOUDFLARE_ENV` is set for that one command only);
-2. `npm run security:scan` — stops if a committable file contains a credential, or the client
-   bundle contains server code, a secret value or a source map;
-3. the **pre-deploy check** (`tsx scripts/predeploy-check.ts --env <env>`, CP-2.1 H2), which reads
-   the build output and prints `Pre-deploy check (<env>) FAILED — nothing was uploaded` unless
-   it is the intended environment (Worker name, routes, `APP_ENV`, an https `APP_ORIGIN`, Resend
-   email, no debug logging, no `workers.dev` or preview URLs) with no `REPLACE_WITH_…`
-   placeholder, no localhost or `http://` reference, no development mailbox (`DEV_MAILBOX` or any
-   KV namespace), no Turnstile test key, a real D1 UUID, no secret passed as a var, and exactly
-   the required secrets declared. It prints field names only, never values;
-4. `wrangler deploy --experimental-provision=false` (CP-2.1 H4): a missing database or bucket
-   fails the deploy instead of being created.
+## 7. Rolling back
 
-Expected during the staging/production build — names only, never values:
-`▲ [WARNING] Missing required secrets: AUTH_SECRET, RESEND_API_KEY, TURNSTILE_SECRET_KEY. Add them
-to .dev.vars, .env, or set as environment variables.` The build machine never holds the deployed
-secrets; they live on the Worker (§3). Also expected: `"kv_namespaces" exists at the top level,
-but not on "env.staging"` — leaving KV out of staging and production is deliberate; don't add it.
-
-**Never run `npx wrangler deploy` yourself**, with or without `--env`: after `npm run verify` or
-`npm run test:e2e` the build on disk is the **local development** build, and Wrangler ignores
-`--env` for it (a dry run showed it would upload APP_ENV `development`, the localhost origin,
-capture email and `DEV_MAILBOX`). **Never `export CLOUDFLARE_ENV=…`**: Wrangler treats it like
-`--env`, and it also turns local test builds into staging builds. Always use `npm run
-deploy:<env>`, which rebuilds for the right environment first.
-
-The staging custom domain is attached by the deploy (`routes` in `env.staging`).
-
-## 6. Create the first Owner (you run — once per environment)
-
-1. Open `https://staging.vorawebsites.store/setup` (Access will ask you to sign in first).
-2. Enter the `SETUP_TOKEN` value, your name, email and a strong password.
-3. **Save the 10 recovery codes offline** (password manager). They are shown once.
-4. Remove the token — `/setup` already answers 404 once an Owner exists, this removes the secret:
-
-   ```sh
-   npx wrangler secret delete SETUP_TOKEN --env staging
-   ```
-
-5. Invite other people from the admin (Owners/Admins/Managers invite roles below their own).
-
-## 7. Smoke test (you run — after every deploy)
-
-Staging is behind Access, so check it in the browser:
-
-- `/api/health/ready` → `{"status":"ready"}`
-- `/status` → components listed; `/admin/system` (signed in) → database *Operational*,
-  `N migrations applied`, email transport `resend`. An overall **"degraded"** status is expected
-  at first — until `GEMINI_API_KEY` and `RESEND_WEBHOOK_SECRET` exist and the daily job
-  (03:17 UTC) has run once. Database and storage must be *Operational*.
-- Sign out and in again: the 6-digit code must arrive by email (checks Resend end to end).
-- Submit `/contact` with your own address: the enquiry appears in `/admin/enquiries`, the team
-  notification reaches `projects@`, the confirmation reaches you.
-- Browser DevTools → Network (these close CP-2 items that only Cloudflare can confirm):
-  - any `/assets/*.js` file → response header `X-Content-Type-Options: nosniff` (from
-    `public/_headers`, served by the static-asset service, not the Worker);
-  - navigate client-side to *Account* → the `/account.data` request → `Cache-Control:
-    private, no-store`;
-  - the session cookie is named `__Host-vora_session` and is `Secure; HttpOnly; SameSite=Lax`.
-
-  The same checks run locally in production mode over HTTPS (`npm run test:e2e:https`, CP-2.1);
-  on Cloudflare they still need this look, because the edge and the static-asset service are
-  only there.
-
-Production (public):
-
-```sh
-curl -sS https://vorawebsites.store/api/health/ready
-curl -sSI https://vorawebsites.store/ | grep -Ei 'strict-transport|content-security|x-frame'
-curl -sS https://vorawebsites.store/ | grep -o '/assets/[^"]*\.js' | head -1 \
-  | xargs -I{} curl -sSI https://vorawebsites.store{} | grep -i x-content-type-options
-curl -sSI https://vorawebsites.store/api/dev/mailbox | head -1        # must be 404
-```
-
-Logs: `npx wrangler tail vora-web --format pretty` (production) — every response carries
-`X-Request-Id`, which is also on every log line.
-
-## 8. Production cutover from Mark4 (you run, planned window)
-
-Today `vorawebsites.store` is served by the `vora-websites-mark2` proxy Worker (Railway origin).
-Production `env.production` deliberately has **no routes**, so the first production deploy does
-not touch the live site.
-
-1. `npm run deploy:production` (types `production` to confirm).
-2. Temporarily attach a private hostname for final checks, e.g. `next.vorawebsites.store`
-   (Workers → vora-web → Settings → Domains & Routes → Add custom domain), protected by an
-   Access application like staging. Run section 7 against it. Expected there: production's
-   `APP_ORIGIN` is the apex, so Turnstile-protected forms (contact, and sign-in after repeated
-   failures) **fail on `next.` by design** (`hostname_mismatch`), and links in emails point to
-   the apex (still Mark4). Sign-in, the admin area and pages work. Test forms and email on
-   staging, and again on the apex right after cutover.
-3. Decide what happens to Mark4 data (enquiries, portal users). Nothing is migrated without an
-   export and a written mapping.
-4. Cutover: remove the custom domain / route from `vora-websites-mark2` and attach **only the
-   apex** `vorawebsites.store` to `vora-web` as a Custom Domain. For `www`, add a **Redirect
-   Rule** (Rules → Redirect Rules) sending `www.vorawebsites.store/*` to
-   `https://vorawebsites.store` with a 301, keeping the path and query, and keep a proxied `www`
-   DNS record. Do **not** attach `www` to the Worker: `vora-web` has no host canonicalisation,
-   so on `www` the contact form's Turnstile hostname check would fail and `__Host-` sessions
-   would split between the two hosts. Then add the apex route
-   (`{ "pattern": "vorawebsites.store", "custom_domain": true }`) to `env.production` in
-   `wrangler.jsonc` and redeploy so config matches reality; the pre-deploy check refuses a
-   `www` route. `tests/tooling/deploy-config.test.ts` currently asserts that production has no
-   routes, so that assertion is updated to the exact route at the same time, with your approval.
-   Legacy Mark4 URLs (`/plans`, `/start-a-project`, `/founders`, …) are 301-redirected by the
-   new Worker from the first request.
-5. Keep `vora-websites-mark2` and Railway untouched for 14 days as the rollback path (re-attach
-   the domain to mark2 to roll back).
-6. Remove the temporary `next.` hostname and its Access application.
-
-## 9. Rolling back a bad deploy
-
-```sh
-npx wrangler deployments list --name vora-web     # find the previous version
-npx wrangler rollback --name vora-web             # or: npx wrangler rollback <version-id> --name vora-web
-```
-
-Because migrations are expand-only, the previous Worker version runs on the newer schema. A
-migration that must be undone is handled with Time Travel — see `backup-and-recovery.md`.
-
-A fixed version goes out the normal way (`npm run deploy:production`), never with a direct
-`wrangler deploy` and never with `CLOUDFLARE_ENV` exported (§5).
+- **Application:** Railway → Deployments → redeploy the previous deployment. Migrations are
+  expand-only, so the previous image runs on the newer schema.
+- **A migration that must be undone:** maintenance on → stop the service → restore the
+  pre-migration snapshot (`/data/pre-migrate-<time>.db`, the last three are kept) over the
+  database → redeploy the previous image → maintenance off. See `backup-and-recovery.md` §3.
+- A deploy on a volume has a short outage (no overlap). Deploy at quiet times.

@@ -1,5 +1,5 @@
 /**
- * Structured JSON logging for Workers Logs. Every line carries the request ID. Values under
+ * Structured JSON logging (one line per entry on Railway). Every line carries the request ID. Values under
  * sensitive keys are redacted recursively, so a careless `log.info("x", { body })` cannot leak a
  * password, token, code or cookie.
  */
@@ -71,6 +71,51 @@ export function redact(value: unknown, depth = 0): unknown {
   return out;
 }
 
+/** One redacted log entry, as handed to the sink. */
+export type LogLine = { level: LogLevel; msg: string; time: string } & Record<string, unknown>;
+export type LogSink = (line: LogLine) => void;
+
+/** Default sink: the structured object to the console (what the tests observe). */
+const consoleSink: LogSink = (line) => {
+  if (line.level === "error") console.error(line);
+  else if (line.level === "warn") console.warn(line);
+  else console.log(line);
+};
+
+/**
+ * Railway parses single-line JSON with `message` and `level` (migration §4.6). This sink writes
+ * exactly one line per entry — stderr for warnings and errors, stdout otherwise. The entry is
+ * already redacted; `message` repeats the event name so Railway shows it, and it is placed last
+ * so a data field cannot overwrite it.
+ */
+export function jsonLineSink(
+  write: (stream: "stdout" | "stderr", text: string) => void = (stream, text) =>
+    process[stream].write(text),
+): LogSink {
+  return (line) => {
+    let text: string;
+    try {
+      text = JSON.stringify({ ...line, message: line.msg });
+    } catch {
+      // Unserialisable data (e.g. a BigInt or a cycle) must not lose the entry.
+      text = JSON.stringify({
+        level: line.level,
+        msg: line.msg,
+        message: line.msg,
+        time: line.time,
+      });
+    }
+    write(line.level === "error" || line.level === "warn" ? "stderr" : "stdout", `${text}\n`);
+  };
+}
+
+let sink: LogSink = consoleSink;
+
+/** The Node server installs `jsonLineSink()` at start-up; tests keep the console sink. */
+export function setLogSink(next: LogSink | null): void {
+  sink = next ?? consoleSink;
+}
+
 export interface Logger {
   debug(msg: string, data?: Record<string, unknown>): void;
   info(msg: string, data?: Record<string, unknown>): void;
@@ -85,17 +130,14 @@ export function createLogger(
 ): Logger {
   const emit = (level: LogLevel, msg: string, data?: Record<string, unknown>) => {
     if (LEVELS[level] < LEVELS[minLevel]) return;
-    const line = {
+    const line: LogLine = {
       level,
       msg,
       time: new Date().toISOString(),
       ...(redact(bindings) as Record<string, unknown>),
       ...(data ? (redact(data) as Record<string, unknown>) : {}),
     };
-    // Workers Logs indexes the fields of logged objects.
-    if (level === "error") console.error(line);
-    else if (level === "warn") console.warn(line);
-    else console.log(line);
+    sink(line);
   };
   return {
     debug: (msg, data) => emit("debug", msg, data),

@@ -36,7 +36,7 @@ export const SECRET_PATTERNS: readonly { rule: string; pattern: RegExp }[] = [
   {
     rule: "hard-coded secret assignment",
     pattern:
-      /\b(?:AUTH_SECRET(?:_PREVIOUS)?|RESEND_API_KEY|RESEND_WEBHOOK_SECRET|TURNSTILE_SECRET_KEY|GEMINI_API_KEY|SETUP_TOKEN|CLOUDFLARE_API_TOKEN)\b[ \t]*[:=][ \t]*["'`]?([A-Za-z0-9+/_=.-]{16,})/,
+      /\b(?:AUTH_SECRET(?:_PREVIOUS)?|RESEND_API_KEY|RESEND_WEBHOOK_SECRET|TURNSTILE_SECRET_KEY|GEMINI_API_KEY|SETUP_TOKEN|CLOUDFLARE_API_TOKEN|ORIGIN_AUTH_SECRET|R2_SECRET_ACCESS_KEY|R2_ACCESS_KEY_ID|LITESTREAM_SECRET_ACCESS_KEY)\b[ \t]*[:=][ \t]*["'`]?([A-Za-z0-9+/_=.-]{16,})/,
   },
 ];
 
@@ -55,6 +55,8 @@ export const KNOWN_TEST_FIXTURES: readonly string[] = [
 /** Strings that only exist in server code or secrets and must never reach the browser. */
 export const SERVER_ONLY_MARKERS: readonly string[] = [
   "AUTH_SECRET",
+  "ORIGIN_AUTH_SECRET",
+  "R2_SECRET_ACCESS_KEY",
   "SETUP_TOKEN",
   "RESEND_API_KEY",
   "GEMINI_API_KEY",
@@ -111,6 +113,7 @@ const NOT_COMMITTED = new Set([
   "node_modules",
   ".git",
   ".wrangler",
+  ".vora",
   "build",
   ".react-router",
   "dist",

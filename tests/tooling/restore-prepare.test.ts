@@ -1,5 +1,5 @@
-import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -10,6 +10,7 @@ import {
   referencedTables,
   splitSqlStatements,
 } from "../../scripts/lib/sql-dump";
+import { openDatabase, type SqliteDatabase } from "../../server/platform/sqlite";
 
 /**
  * CP-2.1 · A2 — restoring a D1 export into an empty database.
@@ -17,13 +18,14 @@ import {
  * An export lists each table in creation order followed by its rows; VORA creates tables that
  * reference `users` before `users`, so an unmodified export cannot be imported into an empty
  * database ("no such table: main.users"). `restore-prepare` reorders — never edits — the
- * statements. The last block proves both facts with the exact Wrangler in node_modules, on
- * throwaway local databases only (no network, no account).
+ * statements. The last block proves both facts on a real SQLite engine (libSQL — the engine VORA
+ * now runs on; on CP-3 it used the Wrangler/D1 simulator), on throwaway files only. Railway
+ * backups are Litestream replicas and `VACUUM INTO` copies (scripts/restore-rehearsal.ts); this
+ * tool stays for importing a D1-style SQL export.
  */
 
 const ROOT = process.cwd();
 const TSX = join(ROOT, "node_modules", ".bin", "tsx");
-const WRANGLER = join(ROOT, "node_modules", "wrangler", "bin", "wrangler.js");
 
 // The shape of a real export (see node_modules/miniflare …/d1/dumpSql): tables in creation
 // order, each followed by its rows; sqlite_sequence last; then indexes, triggers and views.
@@ -176,151 +178,74 @@ describe("command-line tools", () => {
   });
 });
 
-describe("with the real Wrangler, on throwaway local databases", { timeout: 120_000 }, () => {
-  const work = mkdtempSync(join(tmpdir(), "vora-restore-wrangler-"));
+describe("on a real SQLite engine (libSQL), on throwaway files", { timeout: 120_000 }, () => {
+  const work = mkdtempSync(join(tmpdir(), "vora-restore-libsql-"));
   afterAll(() => rmSync(work, { recursive: true, force: true }));
 
-  // No account, no token, and any outbound request would hit a dead proxy: local databases only.
-  const DEAD_PROXY = "http://127.0.0.1:9";
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    WRANGLER_SEND_METRICS: "false",
-    WRANGLER_SEND_ERROR_REPORTS: "false",
-    HTTPS_PROXY: DEAD_PROXY,
-    HTTP_PROXY: DEAD_PROXY,
-    https_proxy: DEAD_PROXY,
-    http_proxy: DEAD_PROXY,
-    NO_PROXY: "127.0.0.1,localhost",
-    no_proxy: "127.0.0.1,localhost",
-  };
-  for (const key of ["CLOUDFLARE_ENV", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"])
-    delete env[key];
+  // The same creation-order problem as VORA's first migration: `notes` references `users` before
+  // `users` exists — exactly how a D1 export lists them (creation order, each table's rows after
+  // it, sqlite_sequence last, then indexes and triggers).
+  const D1_STYLE_EXPORT = [
+    "PRAGMA defer_foreign_keys=TRUE;",
+    "CREATE TABLE `notes` (`id` text PRIMARY KEY NOT NULL, `user_id` text REFERENCES `users`(`id`), `body` text, `data` blob);",
+    `INSERT INTO "notes" ("id","user_id","body","data") VALUES('n1','u1','line one' || char(10) || 'it''s; fine',X'00ff10');`,
+    "CREATE TABLE `users` (`id` text PRIMARY KEY NOT NULL, `email` text NOT NULL);",
+    `INSERT INTO "users" ("id","email") VALUES('u1','a@example.test');`,
+    "CREATE TABLE `counters` (`id` integer PRIMARY KEY AUTOINCREMENT, `n` integer);",
+    `INSERT INTO "counters" ("id","n") VALUES(1,1);`,
+    `INSERT INTO "counters" ("id","n") VALUES(2,2);`,
+    "DELETE FROM sqlite_sequence;",
+    `INSERT INTO "sqlite_sequence" ("name","seq") VALUES('counters',2);`,
+    "CREATE TRIGGER `notes_no_update` BEFORE UPDATE ON `notes` BEGIN SELECT RAISE(ABORT, 'notes are append-only'); END;",
+  ].join("\n");
 
-  function database(label: string) {
-    const dir = join(work, label);
-    mkdirSync(join(dir, "migrations"), { recursive: true });
-    // The same creation-order problem as VORA's first migration: `notes` references `users`
-    // before `users` exists.
-    writeFileSync(
-      join(dir, "migrations", "0000_schema.sql"),
-      [
-        "CREATE TABLE `notes` (`id` text PRIMARY KEY NOT NULL, `user_id` text REFERENCES `users`(`id`), `body` text, `data` blob);",
-        "CREATE TABLE `users` (`id` text PRIMARY KEY NOT NULL, `email` text NOT NULL);",
-        "CREATE TABLE `counters` (`id` integer PRIMARY KEY AUTOINCREMENT, `n` integer);",
-        "CREATE TRIGGER `notes_no_update` BEFORE UPDATE ON `notes` BEGIN SELECT RAISE(ABORT, 'notes are append-only'); END;",
-      ].join("\n"),
-    );
-    const config = join(dir, "wrangler.json");
-    writeFileSync(
-      config,
-      JSON.stringify({
-        name: "restore-test",
-        compatibility_date: "2026-09-25",
-        d1_databases: [
-          { binding: "DB", database_name: "t", database_id: "t", migrations_dir: "migrations" },
-        ],
-      }),
-    );
-    return config;
+  async function fresh(label: string): Promise<SqliteDatabase> {
+    return openDatabase({ path: join(work, `${label}.db`) });
   }
 
-  function wrangler(args: string[]): Promise<{ code: number | null; out: string }> {
-    return new Promise((resolve) => {
-      const child = spawn(process.execPath, [WRANGLER, ...args], { cwd: ROOT, env });
-      let out = "";
-      child.stdout.on("data", (d) => (out += d));
-      child.stderr.on("data", (d) => (out += d));
-      child.on("close", (code) => resolve({ code, out }));
-    });
-  }
-
-  async function rows(config: string) {
-    const run = await wrangler([
-      "d1",
-      "execute",
-      "DB",
-      "--local",
-      "--config",
-      config,
-      "--json",
-      "--command",
-      "SELECT * FROM users; SELECT id, user_id, body, hex(data) AS data FROM notes; SELECT * FROM counters; SELECT * FROM sqlite_sequence;",
-    ]);
-    expect(run.code, run.out).toBe(0);
-    return (JSON.parse(run.out.slice(run.out.search(/^\[/m))) as { results: unknown[] }[]).map(
-      (r) => r.results,
-    );
+  async function rows(db: SqliteDatabase) {
+    const out = [];
+    for (const sql of [
+      "SELECT * FROM users",
+      "SELECT id, user_id, body, hex(data) AS data FROM notes",
+      "SELECT * FROM counters",
+      "SELECT * FROM sqlite_sequence",
+    ])
+      out.push((await db.prepare(sql).all()).results);
+    return out;
   }
 
   it("an unmodified export cannot be restored into an empty database; the prepared file can, exactly", async () => {
-    const source = database("source");
-    expect(
-      (await wrangler(["d1", "migrations", "apply", "DB", "--local", "--config", source])).code,
-    ).toBe(0);
-    const seed = await wrangler([
-      "d1",
-      "execute",
-      "DB",
-      "--local",
-      "--config",
-      source,
-      "--command",
-      "INSERT INTO users VALUES ('u1', 'a@example.test'); INSERT INTO notes VALUES ('n1', 'u1', 'line one' || char(10) || 'it''s; fine', X'00ff10'); INSERT INTO counters (n) VALUES (1), (2);",
-    ]);
-    expect(seed.code, seed.out).toBe(0);
-    const exportFile = join(work, "export.sql");
-    const exported = await wrangler([
-      "d1",
-      "export",
-      "DB",
-      "--local",
-      "--config",
-      source,
-      "--output",
-      exportFile,
-    ]);
-    expect(exported.code, exported.out).toBe(0);
+    // The source database, built in a valid order (parents first), as the live database was.
+    const source = await fresh("source");
+    await source.exec(
+      [
+        "CREATE TABLE `users` (`id` text PRIMARY KEY NOT NULL, `email` text NOT NULL);",
+        "CREATE TABLE `notes` (`id` text PRIMARY KEY NOT NULL, `user_id` text REFERENCES `users`(`id`), `body` text, `data` blob);",
+        "CREATE TABLE `counters` (`id` integer PRIMARY KEY AUTOINCREMENT, `n` integer);",
+        "INSERT INTO users VALUES ('u1', 'a@example.test');",
+        "INSERT INTO notes VALUES ('n1', 'u1', 'line one' || char(10) || 'it''s; fine', X'00ff10');",
+        "INSERT INTO counters (n) VALUES (1), (2);",
+        "CREATE TRIGGER `notes_no_update` BEFORE UPDATE ON `notes` BEGIN SELECT RAISE(ABORT, 'notes are append-only'); END;",
+      ].join("\n"),
+    );
 
-    const raw = await wrangler([
-      "d1",
-      "execute",
-      "DB",
-      "--local",
-      "--config",
-      database("raw"),
-      "--file",
-      exportFile,
-    ]);
-    expect(raw.code).not.toBe(0);
-    expect(raw.out).toContain("no such table: main.users");
+    // As-is into an empty database, with foreign keys enforced (as D1 and VORA's libSQL do).
+    const raw = await fresh("raw");
+    const rawError = await raw.exec(D1_STYLE_EXPORT).then(
+      () => null,
+      (e: unknown) => String(e),
+    );
+    expect(rawError).toContain("no such table: main.users");
+    raw.close();
 
-    const preparedFile = join(work, "export.restore.sql");
-    writeFileSync(preparedFile, prepareRestore(readFileSync(exportFile, "utf8")).sql);
-    const target = database("restored");
-    const restored = await wrangler([
-      "d1",
-      "execute",
-      "DB",
-      "--local",
-      "--config",
-      target,
-      "--file",
-      preparedFile,
-    ]);
-    expect(restored.code, restored.out).toBe(0);
-
+    const target = await fresh("restored");
+    await target.exec(prepareRestore(D1_STYLE_EXPORT).sql);
     expect(await rows(target)).toEqual(await rows(source));
-    const update = await wrangler([
-      "d1",
-      "execute",
-      "DB",
-      "--local",
-      "--config",
-      target,
-      "--command",
-      "UPDATE notes SET body = 'x'",
-    ]);
-    expect(update.code).not.toBe(0);
-    expect(update.out).toContain("notes are append-only");
+    await expect(target.prepare("UPDATE notes SET body = 'x'").run()).rejects.toThrow(
+      "notes are append-only",
+    );
+    source.close();
+    target.close();
   });
 });

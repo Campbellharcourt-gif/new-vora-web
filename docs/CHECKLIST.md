@@ -80,3 +80,17 @@ Verification states used in reports: **PASS** (actually run and passed) · **FAI
 
 ## Phases 3–8
 Hero (3) · Public site (4) · Backend/CMS/admin (5) · Portals (6) · VORA AI (7) · QA/launch (8) — see `01-ARCHITECTURE.md` §19.
+
+## Railway migration (plan: `VORA-RAILWAY-MIGRATION.md`; log: `VERIFICATION-LOG.md` RW-1)
+- [x] R0 — CP-3 imported unchanged, docs patch applied, baseline re-run (200 · 124 · 83 · 7)
+- [x] R1 — Node 24 server, platform adapter, static files, one-line JSON logs, graceful shutdown
+- [x] R2 — native Argon2id (byte-identical to @noble), self-test, back-pressure; Durable Object removed
+- [x] R3 — libSQL SQLite (foreign keys, WAL), start-up migrations + snapshots, `affectedRows()`
+- [x] R4 — R2 S3 adapter, in-process limiters, background tasks, UTC scheduler, `/api/health/live`, batch 25
+- [x] R5 — origin authentication, trusted Cloudflare headers, URL from APP_ORIGIN, Access JWT
+- [x] R6 — Node test harness (unchanged test files), Cloudflare-only tests replaced (TEST-MAPPING.md), mutation check 20/20
+- [x] R7 — Dockerfile + Litestream + restore rehearsal (37/37) + Docker rehearsal (25/25) + deploy:check
+- [!] R7 on your Mac — Docker rehearsal and WebKit/Firefox E2E (commands in VERIFICATION-LOG.md RW-1)
+- [!] R8 — accounts (Railway project, volume, sealed variables, spending limit; R2 buckets + tokens; Cloudflare rules, Access, DNS) — your approval (D20–D22, D24)
+- [ ] R9 — staging deploy and verification of every NOT VERIFIED item
+- [ ] R10 — production cutover (separate approval; Mark4 kept 14 days)

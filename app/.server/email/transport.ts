@@ -1,4 +1,5 @@
 import type { AppConfig, WorkerEnv } from "../config/env";
+import type { DevMailbox } from "../platform/types";
 
 export interface EmailMessage {
   to: string;
@@ -102,13 +103,13 @@ export interface CapturedEmail extends EmailMessage {
 export const capturedEmails: CapturedEmail[] = [];
 
 /**
- * Development/test transport: records the message (KV dev mailbox + memory) instead of sending.
+ * Development/test transport: records the message (dev mailbox + memory) instead of sending.
  * Config validation forbids it in staging and production.
  */
 export class CaptureTransport implements EmailTransport {
   readonly name = "capture" as const;
 
-  constructor(private readonly mailbox?: KVNamespace) {}
+  constructor(private readonly mailbox?: DevMailbox) {}
 
   async send(message: EmailMessage): Promise<SendResult> {
     const id = `capture_${crypto.randomUUID()}`;

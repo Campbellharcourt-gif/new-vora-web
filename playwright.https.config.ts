@@ -1,9 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * CP-2.1 · A3 — PRODUCTION MODE over HTTPS, locally. The production build runs in workerd via
- * `wrangler dev --local-protocol https` (self-signed certificate) with APP_ENV=production, an
- * https APP_ORIGIN and a throwaway local database (scripts/https-server.mjs). It checks what the
+ * CP-2.1 · A3 — PRODUCTION MODE over HTTPS, locally (restated for Railway). The production Node
+ * build runs with APP_ENV=production, an https APP_ORIGIN and a throwaway database behind a local
+ * TLS proxy that plays Cloudflare's part — it adds the origin-auth header and CF-Connecting-IP —
+ * so the real production trust path is exercised (scripts/https-server.ts). It checks what the
  * plain-http suite cannot: Secure `__Host-` session cookies, HSTS, the upgrade-insecure-requests
  * CSP, production indexing headers and the absence of development-only endpoints. Nothing here
  * touches Cloudflare.
@@ -25,7 +26,7 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   use: {
     baseURL: "https://localhost:8443",
-    ignoreHTTPSErrors: true, // wrangler's self-signed development certificate
+    ignoreHTTPSErrors: true, // the harness's self-signed development certificate
     trace: "retain-on-failure",
   },
   projects: [
@@ -45,7 +46,7 @@ export default defineConfig({
       : []),
   ],
   webServer: {
-    command: "node scripts/https-server.mjs",
+    command: "npx tsx scripts/https-server.ts",
     url: "https://localhost:8443/api/health",
     ignoreHTTPSErrors: true,
     reuseExistingServer: false,

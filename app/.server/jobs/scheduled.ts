@@ -2,7 +2,7 @@ import { and, eq, inArray, isNotNull, lt, or } from "drizzle-orm";
 import { syncRbac } from "../auth/rbac";
 import type { WorkerEnv } from "../config/env";
 import { createJobContext, type ServerContext } from "../context";
-import { schema } from "../db/client";
+import { affectedRows, schema } from "../db/client";
 import { deliverDue } from "../email/outbox";
 import { newId } from "../lib/ids";
 import { DAY } from "../lib/time";
@@ -40,16 +40,14 @@ export async function runJob(
 }
 
 /**
- * Emails one five-minute run may send (CP-3 · Cloudflare Free). Each costs 2 D1 queries and 1
- * provider request, plus ~4 queries per run, so 10 stays inside a Free invocation's hard limits of
- * 50 D1 queries and 50 external subrequests (the old 25 could reach 54 queries). CPU is another
- * matter: a run that sends 10 measured 60–80 ms locally, over the Free plan's 10 ms, so on Free a
- * backlog drains across several runs rather than one. Nothing is lost or sent twice when a run is
- * cut short: each email is claimed and settled on its own, a stuck claim is retried after 10
- * minutes, and the provider deduplicates by idempotency key. Ordinary emails never wait for this
- * job — they are sent straight after the request that queues them.
+ * Emails one five-minute run may send. Back to the CP-2.1 value of 25 on Railway (migration §8):
+ * CP-3 lowered it to 10 only to fit a Workers Free invocation's 50-query/50-subrequest limits,
+ * which an ordinary Node process does not have. Nothing is lost or sent twice when a run is cut
+ * short (a restart or deploy): each email is claimed and settled on its own, a stuck claim is
+ * retried after 10 minutes, and the provider deduplicates by idempotency key. Ordinary emails
+ * never wait for this job — they are sent straight after the request that queues them.
  */
-export const EMAIL_RETRY_BATCH = 10;
+export const EMAIL_RETRY_BATCH = 25;
 
 /** Every 5 minutes: deliver queued/failed emails with backoff. */
 export async function emailRetryJob(ctx: ServerContext): Promise<void> {
@@ -130,18 +128,24 @@ export async function dailyJob(ctx: ServerContext): Promise<void> {
 
     return {
       rbacSynced,
-      sessionsDeleted: sessions.meta.changes,
-      challengesDeleted: challenges.meta.changes,
-      tokensDeleted: tokens.meta.changes,
-      invitationsDeleted: invites.meta.changes,
-      loginAttemptsDeleted: attempts.meta.changes,
-      outboxDeleted: outbox.meta.changes,
-      aiConversationsDeleted: conversations.meta.changes,
-      enquiriesAnonymised: enquiries.meta.changes,
-      jobRunsDeleted: jobs.meta.changes,
+      sessionsDeleted: affectedRows(sessions),
+      challengesDeleted: affectedRows(challenges),
+      tokensDeleted: affectedRows(tokens),
+      invitationsDeleted: affectedRows(invites),
+      loginAttemptsDeleted: affectedRows(attempts),
+      outboxDeleted: affectedRows(outbox),
+      aiConversationsDeleted: affectedRows(conversations),
+      enquiriesAnonymised: affectedRows(enquiries),
+      jobRunsDeleted: affectedRows(jobs),
     };
   });
 }
+
+/**
+ * The two schedules (UTC), unchanged from the Cloudflare cron triggers. The Node server's
+ * in-process scheduler (server/platform/scheduler.ts) fires `runScheduled` with these strings.
+ */
+export const JOB_SCHEDULES = ["*/5 * * * *", "17 3 * * *"] as const;
 
 export async function runScheduled(
   controller: ScheduledController,

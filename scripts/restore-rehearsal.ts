@@ -1,37 +1,46 @@
 /**
- * LOCAL ONLY — rehearses backup-and-recovery.md §3.2 ("restore from an export into a fresh
- * database") end to end on throwaway local databases (CP-2.1 · A2). It never contacts
- * Cloudflare: every wrangler call is `--local`, against configs generated under
- * .wrangler/restore-rehearsal/ (git-ignored), and `--remote` is refused.
+ * LOCAL ONLY — rehearses docs/runbooks/backup-and-recovery.md end to end on throwaway files
+ * (Railway migration §6.9, R7; CP-2.1 · A2 restated). It never contacts Railway, Cloudflare or
+ * R2: the Litestream replica is a local directory (docker/litestream.file.yml), and `--remote` /
+ * `--env` are refused.
  *
- *   npm run db:restore-rehearsal              # add `-- --keep` to keep .wrangler/restore-rehearsal/
+ *   npm run db:restore-rehearsal                       # needs `litestream` (v0.5) on PATH, or LITESTREAM_BIN
+ *   npm run db:restore-rehearsal -- --keep             # keep .vora/restore-rehearsal/
+ *   npm run db:restore-rehearsal -- --without-litestream   # snapshot path only (reported as such)
  *
- *  1. source   — a fresh local database: migrations, seed content.
- *  2. activity — the production build (vite preview) on the source database: the first Owner via
- *                /setup, a public enquiry, a failed and a successful Owner sign-in (password +
- *                emailed code). Real rows in the auth, audit, security and enquiry tables.
- *  3. export   — `wrangler d1 export DB --local` (backup:export runs the same with --remote).
- *  4. restore  — into FRESH, empty databases: the export as-is (reported for information), and
- *                the file from `npm run db:restore-prepare` (the documented procedure).
- *  5. compare  — schema objects, per-table row counts and SHA-256 of all rows, sqlite_sequence,
- *                applied migrations, quick_check, foreign_key_check, and the protective
- *                triggers still firing.
- *  6. app      — the production build on the RESTORED database: health, /setup stays closed,
- *                the Owner signs in with password + a recovery code issued before the export,
- *                and the enquiry is listed in the admin workspace.
+ *  1. source     — a fresh database file: migrations (by the server at start-up) + base seed.
+ *  2. activity   — the production build (build/server/index.js) running as Litestream's child
+ *                  (`litestream replicate -exec`, exactly as in the container): the first Owner
+ *                  via /setup, a public enquiry, a failed and a successful Owner sign-in (password +
+ *                  emailed code). Real rows in the auth, audit, security and enquiry tables.
+ *  3. backups    — layer 1: the Litestream replica written continuously during the activity;
+ *                  layer 3: a `VACUUM INTO` snapshot (what the server writes before migrations).
+ *  4. restore    — `litestream restore` into a FRESH file; the snapshot copied to another.
+ *  5. compare    — each restored copy against the source: tables, schema objects and their SQL,
+ *                  per-table row counts + SHA-256 of all rows, sqlite_sequence, migrations,
+ *                  quick_check, integrity_check, foreign_key_check, foreign keys enforced, and the
+ *                  protective triggers still firing.
+ *  6. app        — the production build on the RESTORED (Litestream) database: live health,
+ *                  /setup stays closed, the Owner signs in with password + a recovery code issued
+ *                  before the backup, and the enquiry is listed in the admin workspace.
  *
  * Prints no secrets, codes, passwords or row contents — only names, counts, digests and results.
  */
 import { type ChildProcess, execFileSync, spawn, spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { mkdirSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, openSync, rmSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
-import { prepareRestore } from "./lib/sql-dump";
+import { LOCAL_DEFAULTS, readVarsFile } from "../server/local-env";
+import { applyBaseSeed } from "../server/ops";
+import {
+  integrityCheck,
+  openDatabase,
+  readPragmas,
+  type SqliteDatabase,
+} from "../server/platform/sqlite";
 
 const ROOT = process.cwd();
-const WORK = resolve(ROOT, ".wrangler/restore-rehearsal");
-const WRANGLER = resolve(ROOT, "node_modules/wrangler/bin/wrangler.js");
-const VITE = resolve(ROOT, "node_modules/vite/bin/vite.js");
+const WORK = resolve(ROOT, ".vora/restore-rehearsal");
 const PORT = 5190;
 const BASE = `http://localhost:${PORT}`;
 const OWNER = { name: "Rehearsal Owner", email: "owner.rehearsal@vora.test" };
@@ -42,16 +51,16 @@ if (args.includes("--remote") || args.some((a) => a.startsWith("--env"))) {
   process.exit(2);
 }
 const keep = args.includes("--keep");
+const withoutLitestream = args.includes("--without-litestream");
 
-// Children never inherit an environment selection: this is always the LOCAL configuration.
-const childEnv: NodeJS.ProcessEnv = {
-  ...process.env,
-  WRANGLER_SEND_METRICS: "false",
-  WRANGLER_SEND_ERROR_REPORTS: "false",
-  NO_COLOR: "1", // plain text, so errors can be quoted in the summary
-  FORCE_COLOR: "0",
-};
-delete childEnv.CLOUDFLARE_ENV;
+function findLitestream(): string | null {
+  const candidates = [process.env.LITESTREAM_BIN, "litestream"].filter(Boolean) as string[];
+  for (const bin of candidates) {
+    const run = spawnSync(bin, ["version"], { encoding: "utf8" });
+    if (run.status === 0 && /^v?0\.5\./.test(run.stdout.trim())) return bin;
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------------------------------
 // Results
@@ -69,195 +78,121 @@ function check(step: string, ok: boolean, detail: string) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Local databases (each has its own generated config; state lives next to it)
+// Database inspection (libSQL, read-only use)
 
-interface LocalDb {
-  label: string;
-  dir: string;
-  config: string;
-  state: string;
+async function rowsOf(db: SqliteDatabase, sql: string): Promise<Record<string, unknown>[]> {
+  return (await db.prepare(sql).all()).results;
 }
 
-function localDb(label: string): LocalDb {
-  const dir = join(WORK, label);
-  mkdirSync(dir, { recursive: true });
-  const config = join(dir, "wrangler.json");
-  // Same database_id as the project's local binding, so seed.ts and vite preview (which use the
-  // project config with an explicit state directory) address the same SQLite file.
-  writeFileSync(
-    config,
-    JSON.stringify(
-      {
-        name: "vora-restore-rehearsal",
-        compatibility_date: "2026-09-25",
-        d1_databases: [
-          {
-            binding: "DB",
-            database_name: "vora-local",
-            database_id: "vora-local",
-            migrations_dir: resolve(ROOT, "migrations"),
-          },
-        ],
-      },
-      null,
-      2,
-    ),
-  );
-  return { label, dir, config, state: join(dir, ".wrangler", "state") };
-}
-
-function assertLocal(wranglerArgs: string[]) {
-  if (wranglerArgs.includes("--remote") || !wranglerArgs.includes("--local"))
-    throw new Error(`Refusing a non-local wrangler call: wrangler ${wranglerArgs.join(" ")}`);
-}
-
-function wrangler(wranglerArgs: string[]): { ok: boolean; stdout: string; stderr: string } {
-  assertLocal(wranglerArgs);
-  const run = spawnSync(process.execPath, [WRANGLER, ...wranglerArgs], {
-    cwd: ROOT,
-    env: childEnv,
-    encoding: "utf8",
-    maxBuffer: 256 * 1024 * 1024,
-  });
-  return { ok: run.status === 0, stdout: run.stdout ?? "", stderr: run.stderr ?? "" };
-}
-
-// Wrangler colours its errors even when asked not to; strip the escape sequences for the summary.
-const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
-
-function firstError(text: string): string {
-  const line = text
-    .split("\n")
-    .map((l) => l.replace(ANSI, "").trim())
-    .find((l) => /ERROR|error|SQLITE_/.test(l) && !/Logs were written/.test(l));
-  return (line ?? "unknown error").replace(/^✘\s*\[ERROR\]\s*/, "").slice(0, 160);
-}
-
-function parseJson(stdout: string): unknown {
-  const start = stdout.search(/^[[{]/m);
-  if (start < 0) throw new Error("wrangler printed no JSON");
-  return JSON.parse(stdout.slice(start));
-}
-
-/** Runs one or more statements; returns each statement's rows. Throws on SQL errors. */
-function query(db: LocalDb, sql: string): Record<string, unknown>[][] {
-  const run = wrangler([
-    "d1",
-    "execute",
-    "DB",
-    "--local",
-    "--config",
-    db.config,
-    "--json",
-    "--command",
-    sql,
-  ]);
-  const parsed = parseJson(run.stdout) as
-    | { results: Record<string, unknown>[] }[]
-    | { error?: { text?: string } };
-  if (!Array.isArray(parsed))
-    throw new Error(parsed.error?.text ?? firstError(run.stdout + run.stderr));
-  return parsed.map((r) => r.results);
-}
-
-/** A statement that must be refused (the protective triggers). Returns the error text. */
-function refused(db: LocalDb, sql: string): string | null {
-  const run = wrangler([
-    "d1",
-    "execute",
-    "DB",
-    "--local",
-    "--config",
-    db.config,
-    "--json",
-    "--command",
-    sql,
-  ]);
-  const text = `${run.stdout}\n${run.stderr}`;
-  return run.ok && !/"error"/.test(run.stdout) ? null : text;
-}
-
-function tablesOf(db: LocalDb): string[] {
+async function tablesOf(db: SqliteDatabase): Promise<string[]> {
   return (
-    query(
+    await rowsOf(
       db,
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND substr(name, 1, 7) <> 'sqlite_' AND substr(name, 1, 4) <> '_cf_' ORDER BY name",
-    )[0] ?? []
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND substr(name, 1, 7) <> 'sqlite_' ORDER BY name",
+    )
   ).map((r) => String(r.name));
 }
 
-function schemaOf(db: LocalDb): string[] {
+async function schemaOf(db: SqliteDatabase): Promise<string[]> {
   return (
-    query(
+    await rowsOf(
       db,
-      "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE sql IS NOT NULL AND substr(name, 1, 7) <> 'sqlite_' AND substr(name, 1, 4) <> '_cf_' ORDER BY type, name",
-    )[0] ?? []
+      "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE sql IS NOT NULL AND substr(name, 1, 7) <> 'sqlite_' ORDER BY type, name",
+    )
   ).map((r) => JSON.stringify([r.type, r.name, r.tbl_name, r.sql]));
 }
 
 /** Row count and SHA-256 over every row of every table (order-independent). */
-function fingerprint(db: LocalDb, tables: string[]): Map<string, { rows: number; sha256: string }> {
-  const names = [...tables, "sqlite_sequence"];
-  const sql = names.map((t) => `SELECT * FROM "${t.replaceAll('"', '""')}";`).join(" ");
-  const sets = query(db, sql);
+async function fingerprint(db: SqliteDatabase, tables: string[]) {
   const out = new Map<string, { rows: number; sha256: string }>();
-  names.forEach((name, i) => {
-    const rows = (sets[i] ?? []).map((row) => JSON.stringify(Object.entries(row))).sort();
+  for (const name of [...tables, "sqlite_sequence"]) {
+    const rows = (await rowsOf(db, `SELECT * FROM "${name.replaceAll('"', '""')}"`))
+      .map((row) =>
+        JSON.stringify(
+          Object.entries(row).map(([k, v]) => [
+            k,
+            v instanceof ArrayBuffer ? Buffer.from(v).toString("hex") : v,
+          ]),
+        ),
+      )
+      .sort();
     out.set(name, {
       rows: rows.length,
       sha256: createHash("sha256").update(rows.join("\n")).digest("hex"),
     });
-  });
+  }
   return out;
 }
 
+async function refused(db: SqliteDatabase, sql: string): Promise<string | null> {
+  try {
+    await db.prepare(sql).run();
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
 // ---------------------------------------------------------------------------------------------
-// The production build, served by vite preview (workerd) on one database at a time
+// The production build, on one database at a time
 
 let server: ChildProcess | null = null;
 
-async function startApp(db: LocalDb): Promise<void> {
-  const log = openSync(join(WORK, `app-${db.label}.log`), "w");
-  server = spawn(process.execPath, [VITE, "preview", "--port", String(PORT), "--strictPort"], {
-    cwd: ROOT,
-    env: { ...childEnv, VORA_LOCAL_STATE: relative(ROOT, db.state) },
-    stdio: ["ignore", log, log],
-    detached: true,
-  });
-  const deadline = Date.now() + 90_000;
+function appEnv(databasePath: string, secrets: Record<string, string>): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    ...LOCAL_DEFAULTS,
+    ...secrets,
+    APP_ORIGIN: BASE,
+    HOST: "localhost",
+    PORT: String(PORT),
+    DATABASE_PATH: databasePath,
+    LOG_LEVEL: "warn",
+    SCHEDULER: "off",
+  };
+}
+
+async function startApp(
+  label: string,
+  databasePath: string,
+  secrets: Record<string, string>,
+  litestream: { bin: string; replica: string } | null,
+): Promise<void> {
+  const log = openSync(join(WORK, `app-${label}.log`), "w");
+  const node = `${process.execPath} --enable-source-maps build/server/index.js`;
+  const env = appEnv(databasePath, secrets);
+  server = litestream
+    ? spawn(litestream.bin, ["replicate", "-config", "docker/litestream.file.yml", "-exec", node], {
+        cwd: ROOT,
+        env: { ...env, LITESTREAM_FILE_REPLICA: litestream.replica },
+        stdio: ["ignore", log, log],
+      })
+    : spawn(process.execPath, ["--enable-source-maps", "build/server/index.js"], {
+        cwd: ROOT,
+        env,
+        stdio: ["ignore", log, log],
+      });
+  const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
     if (server.exitCode !== null)
-      throw new Error(`The app exited early (see ${relative(ROOT, WORK)}/app-${db.label}.log).`);
+      throw new Error(`The app exited early (see ${relative(ROOT, WORK)}/app-${label}.log).`);
     try {
-      if ((await fetch(`${BASE}/api/health`)).ok) return;
+      if ((await fetch(`${BASE}/api/health/live`)).ok) return;
     } catch {
       // not listening yet
     }
-    await new Promise((r) => setTimeout(r, 300));
+    await new Promise((r) => setTimeout(r, 200));
   }
-  throw new Error("The app did not become healthy within 90 s.");
+  throw new Error("The app did not become healthy within 60 s.");
 }
 
-async function stopApp(): Promise<void> {
+async function stopApp(): Promise<number | null> {
   const child = server;
   server = null;
-  if (!child?.pid || child.exitCode !== null) return;
-  const exited = new Promise((r) => child.once("exit", r));
-  try {
-    process.kill(-child.pid, "SIGTERM"); // the whole group: vite and its workerd processes
-  } catch {
-    child.kill("SIGTERM");
-  }
-  await Promise.race([exited, new Promise((r) => setTimeout(r, 10_000))]);
-  // Wait until the port is free so the database files are no longer in use.
-  for (let i = 0; i < 50; i += 1) {
-    try {
-      await fetch(`${BASE}/api/health`);
-      await new Promise((r) => setTimeout(r, 200));
-    } catch {
-      return;
-    }
-  }
+  if (!child || child.exitCode !== null) return child?.exitCode ?? null;
+  const exited = new Promise<number | null>((r) => child.once("exit", (code) => r(code)));
+  child.kill("SIGTERM");
+  return Promise.race([exited, new Promise<null>((r) => setTimeout(() => r(null), 30_000))]);
 }
 
 /** A tiny browser: keeps cookies, sends same-origin form posts, never follows redirects itself. */
@@ -322,60 +257,126 @@ async function latestSignInCode(browser: Browser, email: string): Promise<string
 
 // ---------------------------------------------------------------------------------------------
 
+async function compare(
+  label: string,
+  source: {
+    tables: string[];
+    schema: string[];
+    before: Map<string, { rows: number; sha256: string }>;
+  },
+  path: string,
+) {
+  const db = await openDatabase({ path });
+  try {
+    const tables = await tablesOf(db);
+    check(
+      `${label}: same tables`,
+      JSON.stringify(tables) === JSON.stringify(source.tables),
+      `${tables.length} of ${source.tables.length}`,
+    );
+    const schema = await schemaOf(db);
+    const kinds = (list: string[], type: string) =>
+      list.filter((s) => s.startsWith(`["${type}"`)).length;
+    check(
+      `${label}: same schema objects (tables, indexes, triggers, SQL text)`,
+      JSON.stringify(schema) === JSON.stringify(source.schema),
+      `${kinds(schema, "table")} tables, ${kinds(schema, "index")} indexes, ${kinds(schema, "trigger")} triggers`,
+    );
+    const after = await fingerprint(db, source.tables);
+    const different = [...source.before]
+      .filter(([t, v]) => after.get(t)?.sha256 !== v.sha256 || after.get(t)?.rows !== v.rows)
+      .map(([t]) => t);
+    check(
+      `${label}: same rows in every table (count + SHA-256)`,
+      different.length === 0,
+      different.length
+        ? `differ: ${different.join(", ")}`
+        : `${source.before.size} tables incl. sqlite_sequence, ${[...after.values()].reduce((n, t) => n + t.rows, 0)} rows`,
+    );
+    const migrations = (await rowsOf(db, "SELECT name FROM d1_migrations ORDER BY id")).map((r) =>
+      String(r.name),
+    );
+    check(
+      `${label}: every migration recorded as applied`,
+      migrations.length === 3,
+      migrations.join(", "),
+    );
+    const integrity = await integrityCheck(db);
+    check(`${label}: PRAGMA quick_check`, integrity.quickCheck === "ok", integrity.quickCheck);
+    const full = String((await db.client.execute("PRAGMA integrity_check")).rows[0]?.[0]);
+    check(`${label}: PRAGMA integrity_check`, full === "ok", full);
+    check(
+      `${label}: PRAGMA foreign_key_check`,
+      integrity.foreignKeyViolations === 0,
+      `${integrity.foreignKeyViolations} violations`,
+    );
+    const pragmas = await readPragmas(db);
+    check(
+      `${label}: foreign keys enforced`,
+      pragmas.foreignKeys === 1,
+      `foreign_keys=${pragmas.foreignKeys}`,
+    );
+    for (const [sql, message] of [
+      ["UPDATE audit_logs SET summary = summary", "audit_logs is append-only"],
+      ["DELETE FROM security_events", "security_events rows are retained for 1 year"],
+      ["DELETE FROM user_roles", "cannot remove the last active owner"],
+    ] as const) {
+      const text = await refused(db, sql);
+      check(
+        `${label}: trigger still protects — ${message}`,
+        text?.includes(message) ?? false,
+        text ? "refused as expected" : "NOT refused",
+      );
+    }
+  } finally {
+    db.close();
+  }
+}
+
 async function main() {
   const started = Date.now();
-  console.log("Restore rehearsal (LOCAL ONLY — nothing is sent to Cloudflare)\n");
+  console.log("Restore rehearsal (LOCAL ONLY — nothing is sent to Railway, Cloudflare or R2)\n");
+  const litestream = withoutLitestream ? null : findLitestream();
+  if (!withoutLitestream && !litestream) {
+    console.error(
+      "Litestream 0.5.x not found. Install it (macOS: `brew install litestream`) or set LITESTREAM_BIN;\n" +
+        "or run with --without-litestream to rehearse the snapshot path only.",
+    );
+    process.exit(1);
+  }
   rmSync(WORK, { recursive: true, force: true });
   mkdirSync(WORK, { recursive: true });
+  const sourcePath = join(WORK, "source", "vora.db");
+  const replica = join(WORK, "replica");
+  const restoredPath = join(WORK, "restored-litestream", "vora.db");
+  const snapshotPath = join(WORK, "restored-snapshot", "vora.db");
 
-  const source = localDb("source");
-  const raw = localDb("restored-raw");
-  const restored = localDb("restored");
-
-  console.log("1. Source: a fresh local database (migrations + seed)");
-  const migrate = wrangler([
-    "d1",
-    "migrations",
-    "apply",
-    "DB",
-    "--local",
-    "--config",
-    source.config,
-  ]);
-  if (
-    !check(
-      "source migrations",
-      migrate.ok,
-      migrate.ok ? "applied" : firstError(migrate.stdout + migrate.stderr),
-    )
-  )
-    throw new Error("stop");
-  execFileSync("npx", ["tsx", "scripts/seed.ts", "--local", "--persist-to", source.state], {
-    cwd: ROOT,
-    env: childEnv,
-    stdio: "ignore",
-  });
-  record("source seed", true, "content seeded");
-
-  console.log("\n2. Activity through the production build on the source database");
-  execFileSync("npx", ["react-router", "build"], { cwd: ROOT, env: childEnv, stdio: "ignore" });
-  execFileSync(process.execPath, ["scripts/e2e-secrets.mjs"], {
-    cwd: ROOT,
-    env: childEnv,
-    stdio: "ignore",
-  });
-  const vars = readFileSync(join(ROOT, "build", "server", ".dev.vars"), "utf8");
-  const setupToken = /^SETUP_TOKEN=(.+)$/m.exec(vars)?.[1]?.trim() ?? "";
+  console.log("1. Build and source database");
+  execFileSync("npx", ["react-router", "build"], { cwd: ROOT, stdio: "ignore" });
+  execFileSync(process.execPath, ["scripts/e2e-secrets.mjs"], { cwd: ROOT, stdio: "ignore" });
+  const secrets = readVarsFile(join(ROOT, "build", "server", ".dev.vars"));
   record("build", true, "local production build with throwaway secrets (build/server/.dev.vars)");
 
+  console.log(
+    `\n2. Activity through the production build${litestream ? " under `litestream replicate -exec`" : ""}`,
+  );
   const password = `Rh-${randomBytes(9).toString("base64url")}-9`;
   let recoveryCode = "";
   let reference = "";
-  await startApp(source);
+  await startApp("source", sourcePath, secrets, litestream ? { bin: litestream, replica } : null);
   try {
+    record("source migrations", true, "applied by the server at start-up");
+    const seedDb = await openDatabase({ path: sourcePath });
+    try {
+      await applyBaseSeed(seedDb);
+    } finally {
+      seedDb.close();
+    }
+    record("source seed", true, "base seed applied while the server runs (a second writer)");
+
     const owner = new Browser();
     const setup = await owner.go("/setup", {
-      setupToken,
+      setupToken: secrets.SETUP_TOKEN ?? "",
       name: OWNER.name,
       email: OWNER.email,
       password,
@@ -433,11 +434,18 @@ async function main() {
       `landed on ${verified.path} (${verified.res.status})`,
     );
   } finally {
-    await stopApp();
+    const code = await stopApp();
+    check("clean shutdown on SIGTERM", code === 0, `exit code ${code}`);
   }
 
-  const sourceTables = tablesOf(source);
-  const before = fingerprint(source, sourceTables);
+  // The source as it is after a clean shutdown.
+  const sourceDb = await openDatabase({ path: sourcePath });
+  const source = {
+    tables: await tablesOf(sourceDb),
+    schema: await schemaOf(sourceDb),
+    before: new Map<string, { rows: number; sha256: string }>(),
+  };
+  source.before = await fingerprint(sourceDb, source.tables);
   const needRows = [
     "users",
     "user_roles",
@@ -451,155 +459,58 @@ async function main() {
     "email_outbox",
     "d1_migrations",
   ];
-  const empty = needRows.filter((t) => (before.get(t)?.rows ?? 0) === 0);
+  const empty = needRows.filter((t) => (source.before.get(t)?.rows ?? 0) === 0);
   check(
     "source has real rows to restore",
     empty.length === 0,
     empty.length
       ? `empty: ${empty.join(", ")}`
-      : `${needRows.length} key tables populated; ${sourceTables.length} tables, ${[...before.values()].reduce((n, t) => n + t.rows, 0)} rows in total`,
+      : `${needRows.length} key tables populated; ${source.tables.length} tables, ${[...source.before.values()].reduce((n, t) => n + t.rows, 0)} rows in total`,
   );
 
-  console.log("\n3. Export (wrangler d1 export --local)");
-  const exportFile = join(WORK, "export.sql");
-  const t0 = Date.now();
-  const exported = wrangler([
-    "d1",
-    "export",
-    "DB",
-    "--local",
-    "--config",
-    source.config,
-    "--output",
-    exportFile,
-  ]);
-  if (
-    !check(
-      "export",
-      exported.ok,
-      exported.ok
-        ? `${statSync(exportFile).size} bytes in ${Date.now() - t0} ms`
-        : firstError(exported.stdout + exported.stderr),
-    )
-  )
-    throw new Error("stop");
+  console.log("\n3–4. Backups and restores into fresh files");
+  mkdirSync(join(WORK, "restored-snapshot"), { recursive: true });
+  await sourceDb.client.execute({ sql: "VACUUM INTO ?", args: [snapshotPath] });
+  sourceDb.close();
+  record("snapshot (VACUUM INTO)", true, "consistent single-file copy written");
 
-  console.log("\n4. Restore into fresh, empty databases");
-  const rawRun = wrangler([
-    "d1",
-    "execute",
-    "DB",
-    "--local",
-    "--config",
-    raw.config,
-    "--file",
-    exportFile,
-  ]);
-  record(
-    "export imported as-is",
-    "info",
-    rawRun.ok
-      ? "succeeded"
-      : `fails: ${firstError(rawRun.stdout + rawRun.stderr)} — this is why the runbook prepares the file first`,
-  );
-
-  const prepared = prepareRestore(readFileSync(exportFile, "utf8"));
-  const preparedFile = join(WORK, "export.restore.sql");
-  writeFileSync(preparedFile, prepared.sql);
-  const t1 = Date.now();
-  const restoreRun = wrangler([
-    "d1",
-    "execute",
-    "DB",
-    "--local",
-    "--config",
-    restored.config,
-    "--file",
-    preparedFile,
-  ]);
-  if (
-    !check(
-      "prepared export imported into a fresh database",
-      restoreRun.ok,
-      restoreRun.ok
-        ? `${prepared.counts.table} tables, ${prepared.counts.data} data statements, ${prepared.counts.schema} indexes/triggers in ${Date.now() - t1} ms`
-        : firstError(restoreRun.stdout + restoreRun.stderr),
-    )
-  )
-    throw new Error("stop");
-
-  console.log("\n5. Compare the restored database with the source");
-  const restoredTables = tablesOf(restored);
-  check(
-    "same tables",
-    JSON.stringify(restoredTables) === JSON.stringify(sourceTables),
-    `${restoredTables.length} of ${sourceTables.length}`,
-  );
-  const schemaA = schemaOf(source);
-  const schemaB = schemaOf(restored);
-  const kinds = (list: string[], type: string) =>
-    list.filter((s) => s.startsWith(`["${type}"`)).length;
-  check(
-    "same schema objects (tables, indexes, triggers, SQL text)",
-    JSON.stringify(schemaA) === JSON.stringify(schemaB),
-    `${kinds(schemaB, "table")} tables, ${kinds(schemaB, "index")} indexes, ${kinds(schemaB, "trigger")} triggers`,
-  );
-  const after = fingerprint(restored, sourceTables);
-  const different = [...before]
-    .filter(([t, v]) => after.get(t)?.sha256 !== v.sha256 || after.get(t)?.rows !== v.rows)
-    .map(([t]) => t);
-  check(
-    "same rows in every table (count + SHA-256)",
-    different.length === 0,
-    different.length
-      ? `differ: ${different.join(", ")}`
-      : `${before.size} tables incl. sqlite_sequence, ${[...after.values()].reduce((n, t) => n + t.rows, 0)} rows`,
-  );
-  const migrations = wrangler([
-    "d1",
-    "migrations",
-    "list",
-    "DB",
-    "--local",
-    "--config",
-    restored.config,
-  ]);
-  check(
-    "migrations recorded as applied",
-    migrations.ok && /No migrations to apply/i.test(migrations.stdout),
-    migrations.ok
-      ? /No migrations to apply/i.test(migrations.stdout)
-        ? "no migrations to apply"
-        : "pending migrations listed"
-      : firstError(migrations.stdout + migrations.stderr),
-  );
-  const quick = query(restored, "PRAGMA quick_check")[0]?.[0]?.quick_check;
-  check("PRAGMA quick_check", quick === "ok", String(quick));
-  const fk = query(restored, "PRAGMA foreign_key_check")[0] ?? [];
-  check("PRAGMA foreign_key_check", fk.length === 0, `${fk.length} violations`);
-  record(
-    "PRAGMA integrity_check",
-    "info",
-    "not permitted by D1 (SQLITE_AUTH); quick_check is used instead",
-  );
-  for (const [sql, message] of [
-    ["UPDATE audit_logs SET summary = summary", "audit_logs is append-only"],
-    ["DELETE FROM security_events", "security_events rows are retained for 1 year"],
-    ["DELETE FROM user_roles", "cannot remove the last active owner"],
-  ] as const) {
-    const text = refused(restored, sql);
-    check(
-      `trigger still protects: ${message}`,
-      text?.includes(message) ?? false,
-      text ? "refused as expected" : "NOT refused",
+  if (litestream) {
+    mkdirSync(join(WORK, "restored-litestream"), { recursive: true });
+    const t0 = Date.now();
+    const restore = spawnSync(
+      litestream,
+      ["restore", "-config", "docker/litestream.file.yml", "-o", restoredPath, sourcePath],
+      {
+        cwd: ROOT,
+        env: { ...process.env, DATABASE_PATH: sourcePath, LITESTREAM_FILE_REPLICA: replica },
+        encoding: "utf8",
+      },
     );
+    if (
+      !check(
+        "litestream restore into a fresh file",
+        restore.status === 0 && existsSync(restoredPath),
+        restore.status === 0
+          ? `restored in ${Date.now() - t0} ms`
+          : ((restore.stderr || restore.stdout).trim().split("\n").at(-1) ?? "failed"),
+      )
+    )
+      throw new Error("stop");
+  } else {
+    record("litestream restore", "info", "NOT RUN (--without-litestream)");
+    mkdirSync(join(WORK, "restored-litestream"), { recursive: true });
+    copyFileSync(snapshotPath, restoredPath);
   }
 
+  console.log("\n5. Compare with the source");
+  if (litestream) await compare("litestream", source, restoredPath);
+  await compare("snapshot", source, snapshotPath);
+
   console.log("\n6. The app on the restored database");
-  await startApp(restored);
+  await startApp("restored", restoredPath, secrets, null);
   try {
-    const health = await fetch(`${BASE}/api/health`);
-    check("health", health.ok, `status ${health.status}`);
+    const live = await fetch(`${BASE}/api/health/live`);
+    check("live health on the restored database", live.ok, `status ${live.status}`);
     const setup = await new Browser().go("/setup");
     check(
       "/setup stays closed (the Owner was restored)",
@@ -610,7 +521,7 @@ async function main() {
     const pwd = await owner.follow("/login", { email: OWNER.email, password, next: "/admin" });
     const recovery = await owner.follow("/login/recovery", { code: recoveryCode, next: "/admin" });
     check(
-      "Owner signs in: password + recovery code issued before the export",
+      "Owner signs in: password + recovery code issued before the backup",
       pwd.path.startsWith("/login/verify") &&
         recovery.path === "/admin" &&
         recovery.res.status === 200,

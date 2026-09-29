@@ -65,17 +65,16 @@ export const DEFAULT_UA =
 /** Builds a real ServerContext; background work is collected so tests can await it. */
 export function makeCtx(options: CtxOptions = {}): ServerContext & { flush(): Promise<void> } {
   const pending: Promise<unknown>[] = [];
+  // Location and network arrive as Cloudflare headers on Railway (CF-IPCountry and the ASN
+  // Transform Rule header), where Workers had `request.cf` (Railway migration R5).
   const request = new Request(options.url ?? `${ORIGIN}/`, {
     headers: {
       "cf-connecting-ip": options.ip ?? "203.0.113.10",
       "user-agent": options.userAgent ?? DEFAULT_UA,
+      ...(options.country ? { "cf-ipcountry": options.country } : {}),
+      ...(options.asn !== undefined ? { "x-vora-asn": String(options.asn) } : {}),
     },
   });
-  if (options.country || options.asn !== undefined) {
-    Object.defineProperty(request, "cf", {
-      value: { country: options.country, asn: options.asn },
-    });
-  }
   const ctx = createServerContext({
     env: options.env ?? testEnv,
     request,

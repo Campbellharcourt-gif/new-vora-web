@@ -1,5 +1,12 @@
 # VORA — Production Architecture
 
+> **Runtime update (Railway migration, 29 Sep 2026).** The application no longer runs on
+> Cloudflare Workers. It is one Node.js 24 service on Railway behind Cloudflare, with SQLite
+> (libSQL) on a volume, Litestream backups to R2, native Argon2id and in-process jobs and rate
+> limits. Sections below that describe Workers, D1, Durable Objects, Cron Triggers or Wrangler are
+> historical; the kernel, routes, services, security design and data model are unchanged. See
+> `docs/VORA-RAILWAY-MIGRATION.md` and `docs/runbooks/deployment.md`.
+
 Version 1.0 · 26 September 2026 · Status: **approved** — D1 (platform), D2 (purpose-built auth),
 D3 (retire public price list) and D4 (Branding/Motion/Film delivered with Solara) approved by you
 on 26 Sep 2026; the remaining §21 items proceed on the recommended defaults until you say otherwise.
