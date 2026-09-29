@@ -67,7 +67,12 @@ npm run test:e2e:https:browsers           # HTTPS production-mode suite in WebKi
   capture email, an http origin, no origin-auth secret, no backups (staging/production).
 - Migrations run at start-up after a snapshot, each file atomically; they are expand-only;
   nothing destructive runs automatically.
-- Real content only: seeded content is draft until someone publishes it.
+- Real content only: seeded content is draft until someone publishes it. Where approved copy or
+  media does not exist yet, the page shows a marked `v-slot` or the survey-drawing plate — never
+  invented copy, clients, figures or stock imagery.
+- The interface uses only the design system (`docs/VORA-DESIGN-SYSTEM.md`): tokens in
+  `app/styles/tokens.css`, components in `app/styles/vora.css` (ported from
+  `docs/design-system/components/bundle.css`), React primitives in `app/components/vora/`.
 - Anything that could not be verified is reported as **NOT VERIFIED**.
 
 ## Documents
@@ -84,6 +89,8 @@ npm run test:e2e:https:browsers           # HTTPS production-mode suite in WebKi
 | `docs/railway/variables.md` | every environment variable (names and meanings; no values) |
 | `docs/railway/TEST-MAPPING.md` | retired Cloudflare-only tests and their Railway replacements |
 | `docs/VORA-DESIGN-SYSTEM.md` | the visual source of truth for the rebuild |
+| `docs/design-system/` | the design-system source: tokens, fonts (OFL), component CSS/JS, guidelines |
+| `docs/FINAL-REPORT.md` | Railway migration + design-system rebuild: architecture, design, tests, security, remaining work |
 | `docs/runbooks/deployment.md` | Railway + Cloudflare set-up (with approval), deploy, first Owner, cutover, rollback |
 | `docs/runbooks/backup-and-recovery.md` | Litestream, volume backups, snapshots, restores, drills, rehearsals |
 | `docs/runbooks/operations.md` | health, logs, maintenance, lockouts, secrets rotation, outbox |

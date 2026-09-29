@@ -325,7 +325,7 @@ removed.
 - WebKit and Firefox were not re-run: the CP-3 changes are server-side only.
 
 
-## RW-1 — Railway migration R1–R7 · 29 Sep 2026 · build sandbox (current checkpoint)
+## RW-1 — Railway migration R1–R7 · 29 Sep 2026 · build sandbox
 
 **Baseline:** CP-3 Free (`vora-cp3-cloudflare-free.zip`, SHA-256 `b8127146…59281dd`, 224 files),
 imported unchanged as commit `5b67c21`, plus the design-system/Railway docs patch (`37f1a75`). The
@@ -384,3 +384,50 @@ no Cloudflare/R2 resource, no DNS change, no secret read or rotated, no data mig
   permitted): `npx playwright install webkit firefox && npm run test:e2e:browsers &&
   npm run test:e2e:https:browsers` on your Mac.
 - **Docker on your Mac:** `npm run docker:build && npx tsx scripts/docker-rehearsal.ts --image vora-web:local`.
+
+## DS-1 — Phase 2 rebuild on the VORA design system · 29 Sep 2026 · build sandbox (current checkpoint)
+
+**Scope:** every route rebuilt on `docs/VORA-DESIGN-SYSTEM.md` and its source in
+`docs/design-system/` (tokens, fonts, `bundle.css`/`bundle.js`), on top of RW-1 (`8ba10d0`).
+Commits `59ae614`, `aeac42e`, `4a7dcfc`. The server, database, security and deployment code of
+RW-1 is unchanged except: the public Ask VORA endpoint (`POST /api/v1/ai/ask`, off by default),
+three read-only published-content queries, the kernel maintenance/unavailable page styles, and
+two stale code comments. **Nothing was deployed, purchased or created; no data migrated.**
+
+### What changed
+
+| Area | Change |
+|---|---|
+| Tokens and type | Appendix A tokens (Basalt / Mist / workspace roles, type scale, spacing, motion); the four OFL fonts copied byte-for-byte from `docs/design-system/fonts` into `app/assets/fonts` (hashed, immutable), `font-display: swap` with metric-matched fallbacks computed from the files; Archivo preloaded everywhere, the display cut on public pages |
+| Components | `app/styles/vora.css` ports `bundle.css` (plus responsive, header, menu, page, portal and T0 rules); React primitives in `app/components/vora/`; forms rewritten on the same API (field ids stable for error-summary links; the error text stays exactly the message, the "Error:" prefix is the icon's accessible name) |
+| Motion | reveals armed after hydration, before paint; anything on screen at load is never hidden (LCP safe); 2.5 s safety timeout; View Transitions on public links; T0 = the OS setting (and Save-Data) — the Motion toggle waits for approval of its cookie |
+| Routes | Home (T0 stations), Work (features < 4, tiles ≥ 4, index ≥ 6, filters ≥ 6 in ≥ 2 categories), case study, Services, service pages, Our Story (chapters, triptych, process), Partners (Mist), Careers, role, Contact (sticky context, sections, input kept on errors), Legal (Mist, contents, last updated), Status, 404/errors (request reference), maintenance, auth (Basalt), portals (Mist workspace, drawer dialog) |
+| VORA AI | grounded public assistant: published content only, allow-listed source links, rate limits/budgets/circuit breaker via `runAi`; entry points render only when the flag, the setting and a server key are all present; the panel's code loads on first open |
+
+### Results (after the last code change, `4a7dcfc`)
+
+| Suite | Result |
+|---|---|
+| `npm run verify` — typecheck · lint (237 files) · unit+tooling · integration · build | PASS — 239/239 · 160/160 (+8: `ask-vora`) |
+| E2E Chromium desktop + Pixel 7 | 102/102 — the 83 CP-3 tests (spec files byte-identical) + 19 in `design-system.spec.ts` (self-hosted fonts and no off-site requests, first paint visible, reduced motion, current section, focus after navigation, assistant absent while off, menu dialog + no-JS menu, axe on every public page, both motion modes, member/account and admin areas, the admin drawer) |
+| E2E HTTPS production mode | 7/7 |
+| Mutation check | 20/20 caught |
+| Restore rehearsal | 37/37 (the restored Owner signs in and reaches the rebuilt admin) |
+| Docker image + rehearsal · `deploy:check` | PASS · 25/25 · PASS |
+| `security:scan` | no findings |
+| Clean room (fresh clone of `4a7dcfc`, `npm ci`, no local files) | verify 239 + 160 · E2E 102 · HTTPS 7 · scan clean |
+| Visual audit (production build, published copy of the seeded drafts in a throwaway local database) | every route at 1440 and 390 px (menu also at 320): no console errors, no horizontal overflow; findings fixed — desktop nav alignment, Contact column order, choice-group double hairline, CTA tick, triptych word breaks, × wrapping, menu email breaks, slot length |
+| Ask VORA in a browser (local stand-in for the Gemini endpoint via `AI_GATEWAY_BASE_URL`, throwaway database) | entry point → panel (code fetched on first open) → loading with Stop → answer with only allow-listed sources (an off-site source dropped) → failure message from the server → Stop → Esc closes and returns focus; no page errors |
+| Page weight (gzip, production build) | CSS 11.7 KB (all pages); HTML 6–9 KB; JavaScript before interaction 118–124 KB (baseline RW-1 115–117 KB; React + React Router ≈ 111 KB) — **3–4 KB over the 120 KB budget on the marketing pages**; fonts 197 KB in 4 files (budget ≤ 200 KB) |
+| Checkpoint integrity | uploaded ZIPs, patches and documents: SHA-256 unchanged; the CP-3 reference copy still 224 files; `docs/VORA-DESIGN-SYSTEM.md`, `docs/VORA-RAILWAY-MIGRATION.md` and `docs/design-system/` unchanged since `37f1a75` |
+
+### Still NOT VERIFIED (design)
+
+- **WebKit and Firefox** (desktop Safari, iPhone, Firefox) — not installed here:
+  `npx playwright install webkit firefox && npm run test:e2e:browsers` on your Mac.
+- **VoiceOver** (macOS and iOS) pass on Home, a case study, Contact and the enquiry detail.
+- **Real media**: no media delivery route exists yet (Phase 5), so apertures show the survey
+  plate or the typographic plate; `<picture>`/`srcset`/focal-point/priority code is in place but
+  unexercised with real images. Video, lightbox and embeds are not built (no media to show).
+- **Lighthouse on a mid-range phone** (LCP, CLS, INP) — not measured here.
+- **Ask VORA with the real provider** — needs `GEMINI_API_KEY`, the flag and the setting (D8).
