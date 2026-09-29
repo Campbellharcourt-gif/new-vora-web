@@ -1,7 +1,7 @@
 # VORA — Railway migration + design-system rebuild: final report
 
-**Branch** `claude/charming-newton-fuhcej` · **Code** `4a7dcfc` (RW-1 `8ba10d0` + DS-1) · 29 Sep 2026 ·
-details and every command's output summary: `docs/VERIFICATION-LOG.md` (RW-1, DS-1).
+**Branch** `claude/charming-newton-fuhcej` · **Code** `debffd5` (RW-1 `8ba10d0` + DS-1 + DS-2) · 29 Sep 2026 ·
+details and every command's output summary: `docs/VERIFICATION-LOG.md` (RW-1, DS-1, DS-2).
 
 > **This is a staging-ready build, verified locally — not production-ready.** Nothing here has run
 > on Railway, Cloudflare, R2, Resend, Turnstile or Gemini, in WebKit/Firefox, or with a screen
@@ -80,22 +80,23 @@ to show; embeds would also need a CSP decision), and admin AI tools (no CMS edit
 
 | Category | Status |
 |---|---|
-| Typecheck, lint (Biome, 237 files) | **Passed** |
+| Typecheck, lint (Biome, 238 files) | **Passed** |
 | Unit + tooling | **Passed** 239/239 |
 | Integration (Node, real SQLite/storage/limiter adapters) | **Passed** 160/160 |
-| E2E Chromium (desktop + Pixel 7), production build | **Passed** 102/102 (83 CP-3 + 19 design-system) |
-| E2E HTTPS production mode behind a local Cloudflare stand-in | **Passed** 7/7 |
+| E2E Chromium (desktop + Pixel 7), production build | **Passed** 102/102 (83 CP-3 + 19 design-system), re-run on `debffd5` |
+| E2E HTTPS production mode behind a local Cloudflare stand-in | **Passed** 7/7, re-run on `debffd5` |
 | Accessibility (axe WCAG 2.2 A/AA): every public page, 404, sign-in, both motion modes, member/account and admin areas, menu open | **Passed** (no serious/critical) |
 | Security scan (repository + client bundle) | **Passed** — no findings |
-| Mutation check | **Passed** 20/20 regressions caught |
-| Clean room (fresh clone, `npm ci`) | **Passed** — verify, E2E, HTTPS, scan |
-| Docker image build + rehearsal | **Passed** 25/25 |
-| `deploy:check` (image validates both environment templates) | **Passed** |
-| Restore rehearsal (Litestream file replica) | **Passed** 37/37 |
+| Mutation check | **Passed** 20/20 regressions caught (on `4a7dcfc`) |
+| Clean room (fresh clone, `npm ci`) | **Passed** — verify, E2E, HTTPS, scan (on `4a7dcfc`; not re-run for DS-2, which changes client packaging only) |
+| Docker image build + rehearsal | **Passed** 25/25 (on `4a7dcfc`) |
+| `deploy:check` (image validates both environment templates) | **Passed** (on `4a7dcfc`) |
+| Restore rehearsal (Litestream file replica) | **Passed** 37/37 (on `4a7dcfc`) |
 | Visual audit against the design system (1440 / 390 / 320 px) | **Passed** after fixes (log DS-1) |
 | Ask VORA states in a browser (local provider stand-in) | **Passed** |
 | Performance: CSS 11.7 KB, fonts 197 KB | **Passed** (budgets 50 KB HTML+CSS, 200 KB fonts) |
-| Performance: JS before interaction 118–124 KB gzip | **Failed by 3–4 KB** on marketing pages (budget 120; React + React Router ≈ 111 KB) — see §8 |
+| Performance: JS before interaction 116.1–119.8 KB gzip on the marketing pages (was 120.3–124.0) | **Passed** — under 120,000 B on all 19; tightest: service pages 163 B under, Contact 214 B (DS-2) |
+| Focus after choosing a page from the **mobile menu dialog** | **Failed** — focus lands on `<body>`, not the new h1: the page changes while `#main` is still inert behind the closing dialog. Present since DS-1 (`0230357`), found by the DS-2 browser sweep, not fixed there (outside its scope); desktop navigation is correct |
 | WebKit / Firefox E2E | **Requires human verification** (your Mac) |
 | VoiceOver (macOS / iOS) | **Requires human verification** |
 | Lighthouse (LCP/CLS/INP on a mid-range phone) | **Requires human verification** |
@@ -155,6 +156,14 @@ versions for Node), and the Cloudflare-only tests — each replaced by equivalen
 | Deleted | `app/routes/public/site.module.css`, `app/routes/auth/auth.module.css`, `app/components/ui/forms.module.css`, `app/components/ui/Logo.module.css`, `app/components/workspace/workspace.module.css` | Phase 1 provisional styles, superseded by the token + component layer |
 | Docs | `README.md`, `docs/CHECKLIST.md`, `docs/VERIFICATION-LOG.md`, this report | status and evidence |
 
+**DS-2** (`debffd5`, 1 created / 5 changed): the JavaScript budget.
+
+| | Files | Why |
+|---|---|---|
+| Created | `app/components/vora/aperture.tsx` | Aperture moved out of the primitives, byte-identical, so pages without media never download it |
+| Changed | `vite.config.ts` (two client chunk groups); `app/components/vora/{primitives,projects}.tsx`, `app/routes/public/{service,project}.tsx` (imports; `cx`/`Style` exported) | packaging only — no behaviour, style or test change |
+| Docs | `docs/VERIFICATION-LOG.md` (DS-2), this report | measurements and evidence |
+
 ## 7. Checkpoints
 
 | | |
@@ -171,14 +180,16 @@ versions for Node), and the Cloudflare-only tests — each replaced by equivalen
 **Before Railway staging (your decisions/approval — R8):** D20 plan + spending limit, D21 region,
 D22 staging protection, D24 database; create the Railway project/volume/variables and the R2
 buckets, token, Turnstile widget, Transform Rules and Access application (`runbooks/deployment.md`
-§1–2). Run WebKit/Firefox E2E and the Docker rehearsal on your Mac. Decide the JS budget: the
-marketing pages are 3–4 KB over 120 KB (options: accept, or lazy-load the menu dialog's code,
-~1 KB, at the cost of a fetch on first open).
+§1–2). Run WebKit/Firefox E2E and the Docker rehearsal on your Mac. Fix the mobile-menu focus
+issue above (a small change to `SiteHeader`/`useFocusHeadingOnNavigate` plus an E2E assertion).
+The JavaScript budget is met since DS-2, with thin margins on the service pages (163 B) and
+Contact (214 B). Rebuild the release ZIP from the final commit (the DS-1 ZIP is `0230357`).
 
 **Staging verification (R9):** everything marked *requires Railway/Cloudflare* above — deploy,
 origin refusal without the header, client IP and location, Resend codes, Turnstile, Access,
 Litestream to R2 and a restore drill, logs, health checks, `railway ssh` operator commands; a
-Lighthouse run and a VoiceOver pass on staging.
+Lighthouse run and a VoiceOver pass on staging, with Lighthouse CI budgets on Home, Work, a case
+study, Contact and Sign in (design system §14) to hold the JavaScript budget.
 
 **Production (R10, separate approval):** the cutover plan (`runbooks/deployment.md` §6), D12 Mark4
 data decision, Mark4 kept 14 days.

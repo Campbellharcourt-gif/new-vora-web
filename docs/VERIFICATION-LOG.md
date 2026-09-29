@@ -385,7 +385,7 @@ no Cloudflare/R2 resource, no DNS change, no secret read or rotated, no data mig
   npm run test:e2e:https:browsers` on your Mac.
 - **Docker on your Mac:** `npm run docker:build && npx tsx scripts/docker-rehearsal.ts --image vora-web:local`.
 
-## DS-1 — Phase 2 rebuild on the VORA design system · 29 Sep 2026 · build sandbox (current checkpoint)
+## DS-1 — Phase 2 rebuild on the VORA design system · 29 Sep 2026 · build sandbox
 
 **Scope:** every route rebuilt on `docs/VORA-DESIGN-SYSTEM.md` and its source in
 `docs/design-system/` (tokens, fonts, `bundle.css`/`bundle.js`), on top of RW-1 (`8ba10d0`).
@@ -431,3 +431,92 @@ two stale code comments. **Nothing was deployed, purchased or created; no data m
   unexercised with real images. Video, lightbox and embeds are not built (no media to show).
 - **Lighthouse on a mid-range phone** (LCP, CLS, INP) — not measured here.
 - **Ask VORA with the real provider** — needs `GEMINI_API_KEY`, the flag and the setting (D8).
+
+## DS-2 — JavaScript budget on the marketing pages · 29 Sep 2026 · build sandbox (current checkpoint)
+
+**Scope:** DS-1 left the marketing pages 0.3–4.0 KB over the design system's budget for
+JavaScript before interaction (§14: under 120 KB gzipped, "React, the router and the page",
+excluding lazy chunks). The design system writes KB as 1,000 bytes: its fonts are "≈90 KB" at
+90,104 B and "161 KB in total" at 161,204 B. So the budget is **120,000 bytes**. No behaviour,
+style, test or dependency changed; two routes' import lines did.
+
+**Method (same before and after):** production build (`npm run build`). For each page, every
+`/assets/*.js` file its server-rendered HTML asks the browser to load (the `modulepreload` links
+and the module script) was gzipped one file at a time with zlib level 6, and the results summed.
+The public pages were read from a local server with the seeded drafts published in a throwaway
+database. Every route, portals included, was also computed from the build's route manifest
+(entry + imports + each matched route's module and imports). The two methods agree to the byte.
+
+### What changed
+
+| File | Change | Effect |
+|---|---|---|
+| `vite.config.ts` | Two chunk groups for the client build. **framework:** React, React DOM, the scheduler, React Router and React Router's default client entry in one file instead of four. **root:** the root route with the three modules it already imports on every page (the wordmark, the primitives, their icons), in one file instead of four. | Changes how code is packaged, never what a page loads: each group joins files every page already downloads. That removes the import/export lists between them, and gzip compresses them as one. About −3.2 KB and −0.5 KB on every page. |
+| `app/components/vora/aperture.tsx` (new), `primitives.tsx`, `projects.tsx`, `routes/public/{service,project}.tsx` | `Aperture` (with `MediaAsset` and `Ratio`) moved, byte-identical, out of `primitives.tsx` into its own module, and its three importers updated. `primitives.tsx` now exports its `cx` and `Style` helpers. | Only Home, Work, the case studies and the service pages use Aperture, and they all load the project components already, so the bundler puts it in that chunk (no new file). Contact, legal, careers, status, sign-in and the portals stop downloading it: about −0.47 KB. |
+
+The framework group puts the client entry in the same file as React, so route modules now
+evaluate it before the inline bootstrap script registers them. This is deterministic, not timing:
+`hydrateRoot` only schedules work, and `HydratedRouter` reads the registered route modules when it
+first renders, on a later task (`react-router/dist/production/lib/dom-export/hydrated-router.js`,
+`initSsrInfo`). The full E2E suites below exercise hydration, navigation and forms on every area.
+
+### Before → after (bytes, gzip, JavaScript before interaction; budget 120,000)
+
+| Page | Before (`0230357`) | After (`debffd5`) | Change | Under budget by |
+|---|---:|---:|---:|---:|
+| Home `/` | 122,893 (**over**) | 119,184 | −3,709 | 816 |
+| Work `/work` | 121,705 (**over**) | 118,029 | −3,676 | 1,971 |
+| Case study `/work/:slug` (×2) | 122,687 (**over**) | 119,009 | −3,678 | 991 |
+| Services `/services` | 121,041 (**over**) | 116,881 | −4,160 | 3,119 |
+| Service `/services/:slug` (×4) | 123,541 (**over**) | 119,837 | −3,704 | 163 |
+| Our Story `/our-story` | 122,560 (**over**) | 118,400 | −4,160 | 1,600 |
+| Partners `/partners` | 121,476 (**over**) | 117,318 | −4,158 | 2,682 |
+| Careers `/careers` | 120,783 (**over**) | 116,618 | −4,165 | 3,382 |
+| Role `/careers/:slug` (×2) | 121,714 (**over**) | 117,548 | −4,166 | 2,452 |
+| Contact `/contact` | 123,962 (**over**) | 119,786 | −4,176 | 214 |
+| Terms · Privacy · Cookies | 121,373 (**over**) | 117,227 | −4,146 | 2,773 |
+| Status `/status` | 120,273 (**over**) | 116,136 | −4,137 | 3,864 |
+
+The framework — React, React DOM, the scheduler and React Router — was 111,063 B in four files and is now 108,039 B in one.
+
+Every other route also got smaller and none grew: sign-in 118,246 → 114,162; the member,
+client, account and admin pages 4.0–4.1 KB smaller each (for example `/admin/enquiries/:id`
+120,395 → 116,279); 404 115,227 → 111,221.
+
+### Investigated and not done
+
+| Candidate | Measured | Why not |
+|---|---|---|
+| Lazy-load the menu dialog (focus trap, inert, Esc, scroll lock) | Removing its code entirely saves 338 B. As a lazy chunk the loading code costs back most of that: 145 B saved **before** the parts it would need — a fallback if the chunk fails to load (otherwise the route's error page replaces the page) and preloading so the first tap never waits. | Too small to close the gap alone, and it adds a network dependency and a failure mode to mobile navigation. The menu's links (`MenuContents`, about 0.6 KB) cannot be deferred at all: the server-rendered `<details>` menu that works without JavaScript and before hydration is hydrated with them. |
+| Lazy-load the reveal code | about 0.4 KB | Arms before paint on every navigation. Loaded later, new content would appear and then hide. It would be fetched right after hydration anyway, so the bytes only leave the measurement, not the critical path. |
+| Lazy-load the error boundary | about 0.8 KB | An error page must not depend on a second network fetch: the errors it reports are often network failures. |
+| Split every page-composition primitive (Aperture, SectionHeader, Invitation…) into its own chunk | Contact −1.3 KB, but Home and the service pages +0.36–0.38 KB (a new file), which put the service pages over | Moves bytes between pages instead of removing them; only Aperture maps onto a chunk its users already load. |
+| terser instead of the default minifier | +172 B on the framework chunk | Larger. |
+
+### Results (final code)
+
+| Suite | Result |
+|---|---|
+| `npm run verify` — typecheck · lint (238 files) · unit+tooling · integration · build | PASS — 239/239 · 160/160 |
+| E2E Chromium desktop + Pixel 7 (production build) | 102/102 — hydration, menu dialog and no-JS menu, focus after navigation, forms, auth, portals, axe |
+| E2E HTTPS production mode | 7/7 |
+| `security:scan` (repository + client bundle) | no findings |
+| Browser sweep of the final build (all 19 marketing pages at 1440 px, 390 px and 390 px with reduced motion; 57 loads) | no console errors or page errors; every page hydrates; on mobile the menu dialog opens with focus inside, and Esc closes it and returns focus to Menu; the no-JS menu navigates; desktop client-side navigation focuses the new h1 without a full reload |
+| Bundle measurement | the table above (the HTML and manifest methods agree to the byte) |
+
+Not re-run for DS-2, because they cover the server and the image, not client packaging: mutation
+check, restore rehearsal, Docker rehearsal, `deploy:check`, clean room (last run on `4a7dcfc`,
+DS-1). The DS-1 release ZIP (`0230357`) does not contain this change.
+
+**Found, not fixed (exists in DS-1 `0230357` too, not caused by DS-2):** after choosing a page
+from the **mobile menu dialog**, focus lands on `<body>` instead of the new page's h1. The page
+changes during the dialog's 320 ms close, while `#main` is still `inert`, so the heading-focus call
+does nothing. Desktop navigation is correct. The DS-1 E2E tests didn't check focus on this path.
+Recorded as follow-up work: a separate, minimal fix to `SiteHeader`/`useFocusHeadingOnNavigate`
+with an E2E assertion.
+
+**Margins:** the service pages are 163 B under the budget and Contact 214 B. Any addition to
+those pages' client code will cross it. The design system's Lighthouse CI budgets (§14; Home,
+Work, a case study, Contact, Sign in) on staging (R9), with the real content published, are the
+guard to add.
+
