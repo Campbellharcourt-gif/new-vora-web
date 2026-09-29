@@ -1,0 +1,22 @@
+# Local development secrets (copy to .dev.vars — never commit .dev.vars).
+# Staging/production values are set with: npx wrangler secret put <NAME> --env <staging|production>
+
+# 32+ random bytes, base64url. Generate: node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+AUTH_SECRET=
+# Optional during rotation: the previous AUTH_SECRET, so existing codes/tokens keep verifying.
+AUTH_SECRET_PREVIOUS=
+
+# Resend (only needed when EMAIL_TRANSPORT=resend)
+RESEND_API_KEY=
+RESEND_WEBHOOK_SECRET=
+
+# Cloudflare Turnstile secret. Leave empty locally to skip verification (logged), or use
+# Cloudflare's public "always passes" TEST secret 1x0000000000000000000000000000000AA together
+# with the test site key already set in wrangler.jsonc. Required in staging/production.
+TURNSTILE_SECRET_KEY=
+
+# Gemini (server-side only; never exposed to the browser)
+GEMINI_API_KEY=
+
+# One-time owner bootstrap token for /setup. Remove after the Owner account exists.
+SETUP_TOKEN=

@@ -1,0 +1,4 @@
+# Workers Static Assets: headers for files served directly from build/client (these responses
+# never pass through the Worker, so the kernel's security headers do not reach them).
+/*
+  X-Content-Type-Options: nosniff

@@ -1,0 +1,53 @@
+.shell {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+.header {
+  padding: var(--space-5) var(--gutter);
+}
+.brand {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  text-decoration: none;
+}
+.main {
+  display: grid;
+  place-items: start center;
+  padding: var(--space-7) var(--gutter) var(--space-9);
+}
+.card {
+  width: 100%;
+  max-width: 26rem;
+  display: grid;
+  gap: var(--space-5);
+}
+.card h1 {
+  font-size: var(--text-2xl);
+}
+.form {
+  display: grid;
+  gap: var(--space-4);
+}
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+}
+.codes {
+  list-style: none;
+  padding: var(--space-4);
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-s);
+  background: var(--color-surface);
+}
