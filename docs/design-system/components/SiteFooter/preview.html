@@ -1,0 +1,20 @@
+<!-- @dsCard group="Navigation" height=380 width=1280 -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>SiteFooter — preview</title></head>
+<body>
+<footer class="v-footer">
+  <div class="v-footer__grid">
+    <div class="v-footer__brand"><span class="v-brand">VORA</span><p class="v-body-s">Creative by Solara. Digital by VORA.</p></div>
+    <nav class="v-footer__col" aria-label="Footer"><p class="v-label">Site</p><a href="#">Work</a><a href="#">Services</a><a href="#">Our Story</a><a href="#">Partners</a><a href="#">Careers</a><a href="#">Contact</a></nav>
+    <div class="v-footer__col v-footer__col--wide"><p class="v-label">Contact</p><a href="#">hello@vorawebsites.store</a><a href="#">projects@vorawebsites.store</a><a href="#">X<span class="v-sr"> (opens in a new tab)</span></a><a href="#">Discord<span class="v-sr"> (opens in a new tab)</span></a></div>
+    <div class="v-footer__col v-footer__col--wide"><p class="v-label">Legal &amp; system</p><a href="#">Privacy</a><a href="#">Terms</a><a href="#">Cookies</a><a href="#">Status</a><a href="#">Sign in</a>
+      <div style="margin-top:var(--space-3)" class="v-stack"><p class="v-label" id="motion-label">Motion</p><div class="v-toggle" role="group" aria-labelledby="motion-label"><button type="button" aria-pressed="true">Full</button><button type="button" aria-pressed="false">Reduced</button></div></div></div>
+  </div>
+  <div class="v-footer__base"><p class="v-label">© 2026 VORA</p></div>
+</footer>
+<script>
+document.querySelectorAll('.v-toggle button').forEach(function(b){ b.addEventListener('click', function(){ document.querySelectorAll('.v-toggle button').forEach(function(x){ x.setAttribute('aria-pressed', String(x===b)); }); }); });
+</script>
+</body>
+</html>

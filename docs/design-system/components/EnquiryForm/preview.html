@@ -1,0 +1,31 @@
+<!-- @dsCard group="Forms" height=900 width=1100 -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>EnquiryForm — preview</title></head>
+<body>
+<div class="v-stage" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;gap:var(--space-8)">
+  <form class="v-form" novalidate>
+    <div class="v-errsum" role="alert" tabindex="-1"><p class="v-label">Error · 2 problems</p><ul><li><a href="#e2">Enter an email address like name@example.com</a></li><li><a href="#m2">Tell us about the project</a></li></ul></div>
+    <fieldset class="v-fieldset"><legend class="v-label">01 — About you</legend>
+      <div class="v-field"><label class="v-field__label" for="n2">Your name</label><input class="v-input" id="n2" autocomplete="name"></div>
+      <div class="v-field"><label class="v-field__label" for="e2">Email</label><input class="v-input" id="e2" type="email" aria-invalid="true" aria-describedby="e2-err"><p class="v-field__error" id="e2-err"><svg class="v-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l6.5 12h-13z M8 6v3.5 M8 11.2v.8"/></svg><span><span class="v-sr">Error: </span>Enter an email address like name@example.com</span></p></div>
+    </fieldset>
+    <fieldset class="v-fieldset"><legend class="v-label">02 — The project</legend>
+      <div class="v-field"><label class="v-field__label" for="m2">About the project</label><textarea class="v-textarea" id="m2" aria-invalid="true" aria-describedby="m2-err"></textarea><p class="v-field__error" id="m2-err"><svg class="v-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l6.5 12h-13z M8 6v3.5 M8 11.2v.8"/></svg><span><span class="v-sr">Error: </span>Tell us about the project</span></p></div>
+    </fieldset>
+    <div><button class="v-btn v-btn--primary" type="button">Send enquiry<svg class="v-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8h12M9.5 4l4 4-4 4"/></svg></button></div>
+  </form>
+  <section class="v-stack" style="gap:var(--space-5)" aria-labelledby="thanks" data-reveal>
+    <p class="v-label">Enquiry received</p>
+    <h2 class="v-display-m" id="thanks" tabindex="-1">Thank you.</h2>
+    <p class="v-body">Your enquiry has been received and will be reviewed by the VORA team.</p>
+    <p class="v-body-s">Your reference is <span class="v-data" style="color:var(--color-text)">VR-7K2M9Q</span>. A confirmation email is on its way.</p>
+    <div class="v-survey v-survey--strong v-draw" style="width:12rem"></div>
+    <p class="v-caption">Example reference</p>
+  </section>
+</div>
+<script>
+VORA.reveal(document.body);
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+<!-- @dsCard group="Navigation" height=760 subtitle="Open state at 390 px · Close replays the opening" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>MenuOverlay — preview</title></head>
+<body>
+<div class="v-menu" role="dialog" aria-modal="true" aria-label="Menu" style="max-width:390px;margin:0 auto;border:1px solid var(--color-line)">
+  <div class="v-menu__top"><span class="v-brand">VORA</span><button class="v-menu-btn" type="button" id="again">Close</button></div>
+  <ul class="v-menu__list" data-reveal><li><a href="#"><span class="v-menu__index">01</span><span class="v-mask"><span class="v-menu__item" style="--i:0">Work</span></span></a></li><li><a href="#"><span class="v-menu__index">02</span><span class="v-mask"><span class="v-menu__item" style="--i:1">Services</span></span></a></li><li><a href="#"><span class="v-menu__index">03</span><span class="v-mask"><span class="v-menu__item" style="--i:2">Our Story</span></span></a></li><li><a href="#"><span class="v-menu__index">04</span><span class="v-mask"><span class="v-menu__item" style="--i:3">Partners</span></span></a></li><li><a href="#"><span class="v-menu__index">05</span><span class="v-mask"><span class="v-menu__item" style="--i:4">Careers</span></span></a></li></ul>
+  <a class="v-btn v-btn--primary v-btn--block" href="#">Start a project<svg class="v-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8h12M9.5 4l4 4-4 4"/></svg></a>
+  <div class="v-menu__foot">
+    <div class="v-stack" style="gap:var(--space-2)"><p class="v-label">Email</p><a class="v-link v-body-s" href="#">hello@vorawebsites.store</a><a class="v-link v-body-s" href="#">projects@vorawebsites.store</a></div>
+    <div class="v-stack" style="gap:var(--space-2)"><p class="v-label">Follow</p><a class="v-link v-body-s" href="#">X</a><a class="v-link v-body-s" href="#">Discord</a></div>
+  </div>
+  <p class="v-menu__small"><a href="#">Status</a><a href="#">Terms</a><a href="#">Privacy</a><a href="#">Cookies</a><a href="#">Sign in</a></p>
+</div>
+<script>
+VORA.reveal(document.body);
+document.getElementById('again').addEventListener('click', function(){ VORA.replay(document.body); });
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+<!-- @dsCard group="Foundations" height=300 -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>SurveyLine — preview</title></head>
+<body>
+<div class="v-stage">
+  <div class="v-stack"><p class="v-caption">Divider · color-line</p><div class="v-survey"></div></div>
+  <div class="v-stack" data-reveal><p class="v-caption">Drawn on entry · dur-slow, ease-out</p><div class="v-survey v-survey--strong v-draw"></div></div>
+  <div class="v-stack"><p class="v-caption">Determinate progress · 64%</p>
+    <div class="v-survey" id="p" role="progressbar" aria-label="Loading the environment" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="v-survey__fill"></div></div></div>
+  <div class="v-stack"><p class="v-caption">Indeterminate · no progress data</p><div class="v-survey v-survey--sweep" role="progressbar" aria-label="Loading"></div></div>
+  <div class="v-row"><button class="v-btn v-btn--secondary v-btn--s" id="again" type="button">Replay</button></div>
+</div>
+<script>
+var p = document.getElementById('p');
+function run(){ VORA.progress(p, 0); VORA.replay(document.body); setTimeout(function(){ VORA.progress(p, 0.64); }, 60); }
+document.getElementById('again').addEventListener('click', run);
+VORA.reveal(document.body); setTimeout(function(){ VORA.progress(p, 0.64); }, 60);
+</script>
+</body>
+</html>

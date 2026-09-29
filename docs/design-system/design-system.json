@@ -1,0 +1,40 @@
+{
+  "v": 3,
+  "assetGroups": {
+    "Other": {
+      "files": {},
+      "name": "Other",
+      "order": []
+    }
+  },
+  "blobs": {
+    "assets/Screenshot~202026-09-16~20at~206.19.09~e2~80~afpm.png": {
+      "blob": "b9011a29272510e1b5ea52648a908a88",
+      "name": "assets/Screenshot 2026-09-16 at 6.19.09\u202fpm.png",
+      "sha256": "3466f1b875d88945666902db6a08666ec7d63338bb61aad390c3d0c5a7e64650",
+      "size": 1555063,
+      "type": "image/png"
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-09-29T00:18:53.408Z",
+    "v": 1
+  },
+  "docs": {
+    "sections": []
+  },
+  "groups": [
+    "Other"
+  ],
+  "layout": "files",
+  "libraries": [],
+  "sections": {},
+  "title": "VORA Design System",
+  "namespace": "VORA",
+  "lastChange": {
+    "by": "Claude",
+    "at": "2026-09-29T00:43:16Z",
+    "via": "Cowork",
+    "note": "Proposal v0.1: tokens, type, 28 components, brand book; kept the eye/star mark you added (assets, pending D5)."
+  }
+}

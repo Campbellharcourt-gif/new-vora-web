@@ -1,0 +1,21 @@
+<!-- @dsCard group="Forms" height=700 -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>TextField — preview</title></head>
+<body>
+<div class="v-stage"><div class="v-form">
+  <div class="v-field"><label class="v-field__label" for="n">Your name</label><input class="v-input" id="n" autocomplete="name" value=""></div>
+  <div class="v-field"><label class="v-field__label" for="e">Email</label><input class="v-input" id="e" type="email" autocomplete="email" value="name@" aria-invalid="true" aria-describedby="e-err">
+    <p class="v-field__error" id="e-err"><svg class="v-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l6.5 12h-13z M8 6v3.5 M8 11.2v.8"/></svg><span><span class="v-sr">Error: </span>Enter an email address like name@example.com</span></p></div>
+  <div class="v-field"><label class="v-field__label" for="c">Company or organisation</label><input class="v-input is-focus" id="c" autocomplete="organization" value="Focus state"></div>
+  <div class="v-field"><label class="v-field__label" for="m">About the project</label><p class="v-field__hint" id="m-hint">Goals, audience, scope, anything we should know.</p>
+    <textarea class="v-textarea" id="m" maxlength="5000" aria-describedby="m-hint m-count"></textarea><span class="v-counter" id="m-count">0 / 5000</span></div>
+  <div class="v-field"><label class="v-field__label" for="s">How did you hear about VORA?</label>
+    <span class="v-selectwrap"><select class="v-select" id="s"><option>Search</option><option>Social media</option><option>Referral or word of mouth</option><option>Solara Studios</option><option>I've worked with VORA before</option><option>Other</option></select></span></div>
+</div></div>
+<script>
+var t=document.getElementById('m'), c=document.getElementById('m-count');
+t.addEventListener('input', function(){ c.textContent = t.value.length + ' / 5000'; });
+</script>
+</body>
+</html>

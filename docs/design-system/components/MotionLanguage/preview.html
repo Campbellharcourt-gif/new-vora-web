@@ -1,0 +1,33 @@
+<!-- @dsCard group="Motion" height=720 width=1200 -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>MotionLanguage — preview</title></head>
+<body>
+<div class="v-stage" id="demo">
+  <div class="v-row" style="justify-content:space-between">
+    <div class="v-row"><button class="v-btn v-btn--primary v-btn--s" id="play" type="button">Replay<svg class="v-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8h12M9.5 4l4 4-4 4"/></svg></button>
+      <div class="v-toggle" role="group" aria-label="Motion"><button type="button" aria-pressed="true" data-m="full">Full</button><button type="button" aria-pressed="false" data-m="reduced">Reduced</button></div></div>
+    <p class="v-caption">One gesture per shot · reveal once</p>
+  </div>
+  <div class="v-demo" id="stage" data-motion="full">
+    <div class="v-demo__cell" data-reveal><p class="v-label">Line masks · 900 ms · 40 ms stagger</p>
+      <h3 class="v-display-m"><span class="v-mask"><span>Design <span class="v-times">×</span></span></span><span class="v-mask"><span style="--i:1">Technology <span class="v-times">×</span></span></span><span class="v-mask"><span style="--i:2"><span class="v-em">Identity</span></span></span></h3></div>
+    <div class="v-demo__cell"><p class="v-label">Aperture · 1100 ms · image settles from 1.06 to 1</p>
+      <figure class="v-aperture" style="--ratio:16/9" data-reveal><div class="v-aperture__view v-plate v-plate--horizon"></div><figcaption class="v-aperture__slot"><span>Media slot</span><span>16:9</span></figcaption></figure></div>
+    <div class="v-demo__cell" data-reveal><p class="v-label">Survey line · 900 ms · from its origin</p><div class="v-survey v-survey--strong v-draw"></div><div class="v-survey v-draw" style="width:62%;transition-delay:120ms"></div></div>
+    <div class="v-demo__cell" data-reveal><p class="v-label">Rows · 60 ms stagger, capped at 320 ms</p>
+      <div class="v-stack" style="gap:var(--space-2)"><p class="v-fade v-heading-s">Discover</p><p class="v-fade v-heading-s" style="--i:1">Define</p><p class="v-fade v-heading-s" style="--i:2">Design</p><p class="v-fade v-heading-s" style="--i:3">Develop</p><p class="v-fade v-heading-s" style="--i:4">Refine</p><p class="v-fade v-heading-s" style="--i:5">Launch</p></div></div>
+  </div>
+</div>
+<script>
+var stage=document.getElementById('stage');
+VORA.reveal(stage);
+document.getElementById('play').addEventListener('click', function(){ VORA.replay(stage); });
+document.querySelectorAll('[data-m]').forEach(function(b){ b.addEventListener('click', function(){
+  stage.setAttribute('data-motion', b.getAttribute('data-m'));
+  document.querySelectorAll('[data-m]').forEach(function(x){ x.setAttribute('aria-pressed', String(x===b)); });
+  VORA.replay(stage);
+}); });
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<!-- @dsCard group="Foundations" height=420 -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Aperture — preview</title></head>
+<body>
+<div class="v-stage">
+  <div class="v-row" style="align-items:flex-start;gap:var(--grid-gap)">
+    <figure class="v-aperture" style="--ratio:21/9;width:62%" data-reveal>
+      <div class="v-aperture__view v-plate v-plate--horizon"></div>
+      <figcaption class="v-aperture__slot"><span>Media slot</span><span>21:9</span></figcaption>
+    </figure>
+    <figure class="v-aperture" style="--ratio:4/5;width:24%" data-reveal>
+      <div class="v-aperture__view v-plate"></div>
+      <figcaption class="v-aperture__slot"><span>Slot</span><span>4:5</span></figcaption>
+    </figure>
+  </div>
+  <div class="v-row"><button class="v-btn v-btn--secondary v-btn--s" id="again" type="button">Replay the opening</button><p class="v-caption">Placeholder plates only · real project media replaces them</p></div>
+</div>
+<script>
+VORA.reveal(document.body);
+document.getElementById('again').addEventListener('click', function(){ VORA.replay(document.body); });
+</script>
+</body>
+</html>
