@@ -520,7 +520,7 @@ those pages' client code will cross it. The design system's Lighthouse CI budget
 Work, a case study, Contact, Sign in) on staging (R9), with the real content published, are the
 guard to add.
 
-## A11Y-1 — Targeted accessibility pass · 29 Sep 2026 · build sandbox (current checkpoint)
+## A11Y-1 — Targeted accessibility pass · 29 Sep 2026 · build sandbox
 
 **Scope:** confirm and fix real keyboard/focus issues only. No redesign, copy, dependency or
 architecture change. Audit: a scripted keyboard pass of the production build, at 1440 px and
@@ -565,4 +565,40 @@ change is two client-only lines of behaviour and one CSS rule.
   here: it needs the assistant switched on.
 - The portal areas were not part of this keyboard pass beyond the existing axe specs.
 - VoiceOver, WebKit and Firefox are unchanged from before: they need human verification.
+
+## SEO-1 — Routes, links and metadata audit · 29 Sep 2026 · build sandbox (current checkpoint)
+
+**Method:** a scripted crawl of the production build of `85fd42c`, served locally over the seeded
+content published in a throwaway database. It covered:
+- `robots.txt` and `sitemap.xml`;
+- every sitemap URL plus `/status`: status code, `<title>`, meta description, canonical,
+  Open Graph, Twitter, robots meta, `X-Robots-Tag`, h1 count and heading order, empty or `#`
+  links, and placeholder or development text;
+- every internal link found, fetched;
+- 404s and the auth and portal routes.
+
+No code changed.
+
+**Correct:**
+- Every internal link resolves (200): the header, the footer, the menu, legal pages, Sign in,
+  and the CTAs to `/contact`.
+- There are no empty or `#` links; the only fragment link is the skip link to `#main`.
+- The 20 sitemap URLs are all real public routes on `APP_ORIGIN`.
+- Titles are unique and page-specific.
+- Every page has exactly one h1, with no skipped heading levels.
+- Unknown pages and slugs return 404 (title "VORA", `noindex`).
+- The auth pages are `noindex`, and the portals redirect to sign-in with `noindex`.
+- The production `robots.txt` blocks only the private areas and points to the sitemap. Every
+  other environment sends `Disallow: /` and `X-Robots-Tag: noindex`, by design (public
+  indexability in production is covered by the HTTPS E2E).
+
+**Left for later (content or SEO decisions, not defects; unchanged since CP-3):**
+- **Meta description** is present only on Home and Contact. Case studies and service pages take
+  theirs from the CMS SEO fields (empty in the seed). The index pages, legal pages, roles and
+  Status have none, because a child route's `meta` replaces the root's default description.
+  These need approved copy.
+- **Canonical, Open Graph and Twitter tags** are not implemented on any page. They need an SEO
+  pass: canonical from `APP_ORIGIN` + path, and an `og:image` asset.
+- The external URLs (x.com, Discord, sailgaming.store, eonclothing.store) come from settings and
+  seed data; their reachability was not checked from this sandbox.
 

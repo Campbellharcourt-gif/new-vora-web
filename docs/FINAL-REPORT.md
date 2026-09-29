@@ -1,7 +1,7 @@
 # VORA — Railway migration + design-system rebuild: final report
 
 **Branch** `claude/charming-newton-fuhcej` · **Code** `debffd5` (RW-1 `8ba10d0` + DS-1 + DS-2) · 29 Sep 2026 ·
-details and every command's output summary: `docs/VERIFICATION-LOG.md` (RW-1, DS-1, DS-2, A11Y-1).
+details and every command's output summary: `docs/VERIFICATION-LOG.md` (RW-1, DS-1, DS-2, A11Y-1, SEO-1).
 
 > **This is a staging-ready build, verified locally — not production-ready.** Nothing here has run
 > on Railway, Cloudflare, R2, Resend, Turnstile or Gemini, in WebKit/Firefox, or with a screen
@@ -191,6 +191,9 @@ study, Contact and Sign in (design system §14) to hold the JavaScript budget.
 
 **Production (R10, separate approval):** the cutover plan (`runbooks/deployment.md` §6), D12 Mark4
 data decision, Mark4 kept 14 days.
+
+**SEO (log SEO-1):** links, sitemap, robots and headings pass. Before launch, write meta
+descriptions for the pages without one, and add canonical and Open Graph tags (needs an `og:image`).
 
 **Final content launch:** approved Terms/Privacy/Cookies (listing `__Host-vora_session`), the copy
 slots (positioning line, Approach final copy, per-page invitations, page leads, service bodies and
