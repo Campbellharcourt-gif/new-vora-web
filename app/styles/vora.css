@@ -1632,6 +1632,10 @@
   .v-form--tight {
     gap: var(--space-5);
   }
+  /* The error summary's slot takes no space until there is something to say. */
+  .v-form > div:empty {
+    display: none;
+  }
   .v-fieldset {
     border: 0;
     margin: 0;
