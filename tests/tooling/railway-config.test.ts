@@ -165,9 +165,25 @@ describe("Railway variable templates (config/railway.*.env.example)", () => {
     });
   }
 
-  it("staging requires Cloudflare Access (D22); production does not", () => {
-    const staging = startupProblems({ ...filled("staging"), CF_ACCESS_AUD: "" });
-    expect(staging.join(";")).toContain("CF_ACCESS_AUD");
+  it("Cloudflare Access is optional in staging, but never half-configured", () => {
+    const withoutAccess = Object.fromEntries(
+      Object.entries(filled("staging")).filter(([key]) => !key.startsWith("CF_ACCESS_")),
+    );
+    expect(startupProblems(withoutAccess)).toEqual([]);
+    expect(
+      startupProblems({ ...filled("staging"), CF_ACCESS_TEAM_DOMAIN: "", CF_ACCESS_AUD: "" }),
+    ).toEqual([]);
+    expect(startupProblems(filled("staging"))).toEqual([]);
+    const halves: Record<string, string>[] = [{ CF_ACCESS_AUD: "" }, { CF_ACCESS_TEAM_DOMAIN: "" }];
+    for (const half of halves) {
+      expect(startupProblems({ ...filled("staging"), ...half }).join(";")).toContain(
+        "CF_ACCESS_AUD",
+      );
+    }
+    // Origin authentication stays mandatory in staging whether or not Access is used.
+    expect(startupProblems({ ...withoutAccess, ORIGIN_AUTH_SECRET: "" }).join(";")).toContain(
+      "ORIGIN_AUTH_SECRET",
+    );
     expect(startupProblems(filled("production"))).toEqual([]);
   });
 

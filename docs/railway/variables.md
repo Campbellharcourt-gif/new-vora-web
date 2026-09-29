@@ -43,8 +43,8 @@ templates against this page and against the start-up validation.
 | Variable | Kind | Staging | Production | Notes |
 |---|---|---|---|---|
 | `ORIGIN_AUTH_SECRET` | **sealed** | ≥ 32 random characters | ≥ 32 random characters | Must equal the value the Cloudflare Transform Rule sets in `X-Vora-Origin-Auth`. Without it (or with a shorter one) staging/production refuse to start; requests without it are refused (403). |
-| `CF_ACCESS_TEAM_DOMAIN` | plain | `<team>.cloudflareaccess.com` | unset | Cloudflare Access; required in staging (D22). |
-| `CF_ACCESS_AUD` | plain | the Access application's AUD tag | unset | Set together with the team domain. |
+| `CF_ACCESS_TEAM_DOMAIN` | plain | unset (optional: `<team>.cloudflareaccess.com`) | unset | Optional Cloudflare Access. When set with `CF_ACCESS_AUD`, every request except `/api/health/live` must carry a valid Access JWT; unset, only origin authentication applies. |
+| `CF_ACCESS_AUD` | plain | unset (optional: the Access application's AUD tag) | unset | Set together with the team domain, or neither — one without the other refuses to start. |
 | `DATABASE_PATH` | plain | `/data/vora-staging.db` | `/data/vora.db` | On the service's volume (mounted at `/data`). Absolute. |
 | `R2_ACCOUNT_ID` | plain | Cloudflare account ID | same | R2's S3 endpoint is `https://<account>.r2.cloudflarestorage.com`. |
 | `R2_BUCKET_MEDIA` | plain | `vora-media-staging` | `vora-media` | Public media. Never created by the app (H4). |

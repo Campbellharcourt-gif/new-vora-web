@@ -43,9 +43,10 @@ Rules that never change:
      `ORIGIN_AUTH_SECRET` — nowhere else);
    - set `X-Vora-ASN` = `to_string(ip.src.asnum)`;
    - Managed Transforms → **Add visitor location headers** on.
-5. **Access (staging only)**: an application for `staging.vorawebsites.store` with a policy naming
-   approved email addresses only (never "Everyone"). Note the team domain and the application
-   **AUD** tag → `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`.
+5. **Access (optional, staging)**: not required — staging is protected by origin authentication
+   alone. If you want a login in front of staging: an application for `staging.vorawebsites.store`
+   with a policy naming approved email addresses only (never "Everyone"); set its team domain and
+   **AUD** tag as `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` (both, or neither).
 6. **SSL/TLS mode: Full** (Railway documents Full (strict) as not working behind its edge).
    Always Use HTTPS on; minimum TLS 1.2. HSTS is sent by the application.
 7. **Bot Fight Mode stays off** until tested against the Resend webhooks.

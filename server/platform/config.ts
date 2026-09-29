@@ -9,8 +9,8 @@ import { MIN_ORIGIN_SECRET_LENGTH } from "./trust";
  *
  * - staging and production refuse to start without `ORIGIN_AUTH_SECRET` (32+ characters),
  *   `DATABASE_PATH`, and the R2 settings;
- * - staging refuses to start without the Cloudflare Access settings (decision D22);
- * - the Access settings come as a pair or not at all.
+ * - Cloudflare Access is optional in every environment: when both settings are present the
+ *   `Cf-Access-Jwt-Assertion` JWT is verified on every request; they come as a pair or not at all.
  *
  * Values are never logged — only the names of the variables that are wrong.
  */
@@ -82,10 +82,6 @@ const schema = z
           message: "only a loopback address (local rehearsals) is allowed in staging/production",
         });
       }
-    }
-    if (env.APP_ENV === "staging") {
-      need("CF_ACCESS_TEAM_DOMAIN", "required in staging (Cloudflare Access, decision D22)");
-      need("CF_ACCESS_AUD", "required in staging (Cloudflare Access, decision D22)");
     }
     if (blank(env.CF_ACCESS_TEAM_DOMAIN) !== blank(env.CF_ACCESS_AUD)) {
       ctx.addIssue({
