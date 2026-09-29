@@ -13,7 +13,6 @@ import { actionError, formString, load } from "~/.server/guards";
 import { RecoveryCodes } from "~/components/account/RecoveryCodes";
 import { Button, ErrorSummary, TextField } from "~/components/ui/forms";
 import type { Route } from "./+types/setup";
-import styles from "./auth.module.css";
 
 /**
  * Set by a successful setup for the rest of the same request (CP-2.1 · A1). Without it, a form
@@ -94,23 +93,23 @@ export default function Setup() {
   const navigation = useNavigation();
   if (result?.ok) {
     return (
-      <div className={styles.card}>
-        <h1>Owner account created</h1>
+      <div className="v-auth__card">
+        <h1 className="v-heading-l">Owner account created</h1>
         <RecoveryCodes codes={result.recoveryCodes} continueTo="/admin" />
       </div>
     );
   }
   const fields = result && !result.ok ? result.fields : {};
   return (
-    <div className={styles.card}>
-      <h1>Create the Owner account</h1>
-      <p className="muted">
+    <div className="v-auth__card">
+      <h1 className="v-heading-l">Create the Owner account</h1>
+      <p className="v-body v-secondary">
         This page works once, with the setup token configured for this environment.
       </p>
       {result && !result.ok ? (
         <ErrorSummary message={result.message} fields={result.fields} />
       ) : null}
-      <Form method="post" className={styles.form} autoComplete="off">
+      <Form method="post" className="v-form v-form--tight" autoComplete="off">
         <TextField
           name="setupToken"
           label="Setup token"

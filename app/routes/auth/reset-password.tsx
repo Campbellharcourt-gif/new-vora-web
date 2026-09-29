@@ -5,7 +5,6 @@ import { completePasswordReset, isResetTokenValid } from "~/.server/auth/passwor
 import { actionError, formString, load } from "~/.server/guards";
 import { Button, ErrorSummary, TextField } from "~/components/ui/forms";
 import type { Route } from "./+types/reset-password";
-import styles from "./auth.module.css";
 
 export async function loader({ context, params }: Route.LoaderArgs) {
   return { valid: await isResetTokenValid(load(context).server, params.token) };
@@ -44,25 +43,25 @@ export default function ResetPassword({ loaderData }: Route.ComponentProps) {
   const navigation = useNavigation();
   if (!loaderData.valid) {
     return (
-      <div className={styles.card}>
-        <h1>This link has expired</h1>
-        <p className="muted">Reset links work once and expire after 30 minutes.</p>
-        <p className={styles.links}>
+      <div className="v-auth__card">
+        <h1 className="v-heading-l">This link has expired</h1>
+        <p className="v-body v-secondary">Reset links work once and expire after 30 minutes.</p>
+        <p className="v-auth__links">
           <Link to="/forgot-password">Request a new link</Link>
         </p>
       </div>
     );
   }
   return (
-    <div className={styles.card}>
-      <h1>Choose a new password</h1>
-      <p className="muted">
+    <div className="v-auth__card">
+      <h1 className="v-heading-l">Choose a new password</h1>
+      <p className="v-body v-secondary">
         Use at least 12 characters. A passphrase of a few unrelated words works well.
       </p>
       {result && !result.ok ? (
         <ErrorSummary message={result.message} fields={result.fields} />
       ) : null}
-      <Form method="post" className={styles.form}>
+      <Form method="post" className="v-form v-form--tight">
         <TextField
           name="password"
           label="New password"

@@ -151,156 +151,179 @@ export default function Security({ loaderData }: Route.ComponentProps) {
 
   return (
     <>
-      <PageHeading
-        eyebrow="Account"
-        title="Security"
-        description="Sessions, password, recovery codes and sign-in history."
-      />
-      {result?.ok && result.message ? <Notice tone="success">{result.message}</Notice> : null}
+      <PageHeading eyebrow="Account" title="Security" />
+      <p className="v-body-s">Sessions, password, recovery codes and sign-in history.</p>
+      {result?.ok && result.message ? (
+        <Notice tone="success" label="Saved">
+          {result.message}
+        </Notice>
+      ) : null}
       {result && !result.ok ? (
         <ErrorSummary message={result.message} fields={result.fields} />
       ) : null}
 
       <Panel
         title="Signed-in sessions"
+        flush
         actions={
           loaderData.sessions.length > 1 ? (
             <Form method="post">
               <input type="hidden" name="intent" value="revoke-others" />
-              <Button variant="secondary" busy={busy}>
+              <Button variant="secondary" size="s" busy={busy}>
                 Sign out all other sessions
               </Button>
             </Form>
           ) : null
         }
       >
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Device</th>
-              <th scope="col">Location</th>
-              <th scope="col">Last active</th>
-              <th scope="col">
-                <span className="visually-hidden">Actions</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {loaderData.sessions.map((s) => (
-              <tr key={s.id}>
-                <td>
-                  {s.device}
-                  {s.current ? <strong> · This device</strong> : null}
-                </td>
-                <td>{s.location}</td>
-                <td>{formatDateTime(s.lastSeenAt)}</td>
-                <td>
-                  {s.current ? null : (
-                    <Form method="post">
-                      <input type="hidden" name="intent" value="revoke-session" />
-                      <input type="hidden" name="sessionId" value={s.id} />
-                      <Button variant="secondary" busy={busy}>
-                        Sign out
-                      </Button>
-                    </Form>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Panel>
-
-      <Panel title="Change password">
-        <Form method="post" className="stack" style={{ maxWidth: "28rem" }}>
-          <input type="hidden" name="intent" value="change-password" />
-          <TextField
-            name="currentPassword"
-            label="Current password"
-            type="password"
-            autoComplete="current-password"
-            required
-            error={fieldsFor("change-password").currentPassword}
-          />
-          <TextField
-            name="newPassword"
-            label="New password"
-            type="password"
-            autoComplete="new-password"
-            minLength={12}
-            required
-            error={fieldsFor("change-password").newPassword}
-          />
-          <TextField
-            name="confirmPassword"
-            label="Confirm new password"
-            type="password"
-            autoComplete="new-password"
-            required
-            error={fieldsFor("change-password").confirmPassword}
-          />
-          <Button busy={busy}>Change password</Button>
-        </Form>
-      </Panel>
-
-      <Panel title="Recovery codes">
-        {result?.ok && result.codes ? (
-          <RecoveryCodes codes={result.codes} />
-        ) : (
-          <>
-            <p>
-              {loaderData.recoveryRemaining} unused recovery code
-              {loaderData.recoveryRemaining === 1 ? "" : "s"}.
-            </p>
-            {loaderData.elevated ? (
-              <Form method="post">
-                <input type="hidden" name="intent" value="regenerate-codes" />
-                <Button busy={busy}>Generate new recovery codes</Button>
-              </Form>
-            ) : (
-              <Form method="post" className="stack" style={{ maxWidth: "28rem" }}>
-                <input type="hidden" name="intent" value="elevate" />
-                <TextField
-                  name="password"
-                  label="Confirm your password to manage recovery codes"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  error={fieldsFor("elevate").password}
-                />
-                <Button variant="secondary" busy={busy}>
-                  Confirm
-                </Button>
-              </Form>
-            )}
-          </>
-        )}
-      </Panel>
-
-      <Panel title="Recent sign-in activity">
-        {loaderData.history.length === 0 ? (
-          <EmptyState>No sign-in activity recorded yet.</EmptyState>
-        ) : (
-          <table>
+        <div className="v-tablewrap">
+          <table className="v-table v-table--stack">
+            <caption className="v-sr">Signed-in sessions</caption>
             <thead>
               <tr>
-                <th scope="col">When</th>
-                <th scope="col">Result</th>
                 <th scope="col">Device</th>
                 <th scope="col">Location</th>
+                <th scope="col">Last active</th>
+                <th scope="col">
+                  <span className="v-sr">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
-              {loaderData.history.map((h) => (
-                <tr key={`${h.createdAt}-${h.outcome}`}>
-                  <td>{formatDateTime(h.createdAt)}</td>
-                  <td>{OUTCOME_LABEL[h.outcome] ?? h.outcome}</td>
-                  <td>{h.device}</td>
-                  <td>{h.location}</td>
+              {loaderData.sessions.map((s) => (
+                <tr key={s.id}>
+                  <td>
+                    <span>
+                      {s.device}
+                      {s.current ? <strong> · This device</strong> : null}
+                    </span>
+                  </td>
+                  <td data-label="Location">{s.location}</td>
+                  <td data-label="Last active" className="v-data">
+                    {formatDateTime(s.lastSeenAt)}
+                  </td>
+                  <td data-label="">
+                    {s.current ? null : (
+                      <Form method="post">
+                        <input type="hidden" name="intent" value="revoke-session" />
+                        <input type="hidden" name="sessionId" value={s.id} />
+                        <Button variant="secondary" size="s" busy={busy}>
+                          Sign out
+                        </Button>
+                      </Form>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      </Panel>
+
+      <div className="v-panels v-panels--two">
+        <Panel title="Change password">
+          <Form method="post" className="v-form v-form--tight">
+            <input type="hidden" name="intent" value="change-password" />
+            <TextField
+              name="currentPassword"
+              label="Current password"
+              type="password"
+              autoComplete="current-password"
+              required
+              error={fieldsFor("change-password").currentPassword}
+            />
+            <TextField
+              name="newPassword"
+              label="New password"
+              type="password"
+              autoComplete="new-password"
+              minLength={12}
+              required
+              error={fieldsFor("change-password").newPassword}
+            />
+            <TextField
+              name="confirmPassword"
+              label="Confirm new password"
+              type="password"
+              autoComplete="new-password"
+              required
+              error={fieldsFor("change-password").confirmPassword}
+            />
+            <div>
+              <Button busy={busy} size="s">
+                Change password
+              </Button>
+            </div>
+          </Form>
+        </Panel>
+
+        <Panel title="Recovery codes">
+          {result?.ok && result.codes ? (
+            <RecoveryCodes codes={result.codes} />
+          ) : (
+            <>
+              <p className="v-body-s">
+                <strong className="v-data">{loaderData.recoveryRemaining}</strong> unused recovery
+                code
+                {loaderData.recoveryRemaining === 1 ? "" : "s"}.
+              </p>
+              {loaderData.elevated ? (
+                <Form method="post">
+                  <input type="hidden" name="intent" value="regenerate-codes" />
+                  <Button busy={busy} size="s">
+                    Generate new recovery codes
+                  </Button>
+                </Form>
+              ) : (
+                <Form method="post" className="v-form v-form--tight">
+                  <input type="hidden" name="intent" value="elevate" />
+                  <TextField
+                    name="password"
+                    label="Confirm your password to manage recovery codes"
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    error={fieldsFor("elevate").password}
+                  />
+                  <div>
+                    <Button variant="secondary" size="s" busy={busy}>
+                      Confirm
+                    </Button>
+                  </div>
+                </Form>
+              )}
+            </>
+          )}
+        </Panel>
+      </div>
+
+      <Panel title="Recent sign-in activity" flush>
+        {loaderData.history.length === 0 ? (
+          <EmptyState>No sign-in activity recorded yet.</EmptyState>
+        ) : (
+          <div className="v-tablewrap">
+            <table className="v-table v-table--stack">
+              <caption className="v-sr">Recent sign-in activity</caption>
+              <thead>
+                <tr>
+                  <th scope="col">When</th>
+                  <th scope="col">Result</th>
+                  <th scope="col">Device</th>
+                  <th scope="col">Location</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loaderData.history.map((h) => (
+                  <tr key={`${h.createdAt}-${h.outcome}`}>
+                    <td className="v-data">{formatDateTime(h.createdAt)}</td>
+                    <td data-label="Result">{OUTCOME_LABEL[h.outcome] ?? h.outcome}</td>
+                    <td data-label="Device">{h.device}</td>
+                    <td data-label="Location">{h.location}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Panel>
     </>

@@ -1,5 +1,6 @@
 import { load, requirePermission } from "~/.server/guards";
 import { listClientEngagements } from "~/.server/services/client-portal";
+import { StatusIndicator } from "~/components/vora/primitives";
 import { EmptyState, PageHeading, Panel } from "~/components/workspace/WorkspaceShell";
 import type { Route } from "./+types/index";
 
@@ -17,17 +18,30 @@ export default function ClientHome({ loaderData }: Route.ComponentProps) {
           There are no engagements shared with you yet. Your VORA contact will add them here.
         </EmptyState>
       ) : (
-        <Panel>
-          <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: "var(--space-3)" }}>
-            {loaderData.engagements.map((e) => (
-              <li key={e.id}>
-                <strong>{e.name}</strong>{" "}
-                <span className="muted">
-                  · {e.orgName} · {e.status.replace("_", " ")}
-                </span>
-              </li>
-            ))}
-          </ul>
+        <Panel title="Engagements" flush>
+          <div className="v-tablewrap">
+            <table className="v-table v-table--stack">
+              <caption className="v-sr">Your engagements</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Engagement</th>
+                  <th scope="col">Organisation</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loaderData.engagements.map((e) => (
+                  <tr key={e.id}>
+                    <td>{e.name}</td>
+                    <td data-label="Organisation">{e.orgName}</td>
+                    <td data-label="Status">
+                      <StatusIndicator kind="info">{e.status.replace("_", " ")}</StatusIndicator>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </Panel>
       )}
     </>

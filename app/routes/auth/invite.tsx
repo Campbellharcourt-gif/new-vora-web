@@ -7,7 +7,6 @@ import { actionError, formString, load } from "~/.server/guards";
 import { RecoveryCodes } from "~/components/account/RecoveryCodes";
 import { Button, ErrorSummary, TextField } from "~/components/ui/forms";
 import type { Route } from "./+types/invite";
-import styles from "./auth.module.css";
 
 export async function loader({ context, params }: Route.LoaderArgs) {
   const preview = await getInvitationPreview(load(context).server, params.token);
@@ -63,8 +62,8 @@ export default function Invite({ loaderData }: Route.ComponentProps) {
 
   if (result?.ok) {
     return (
-      <div className={styles.card}>
-        <h1>Welcome to VORA</h1>
+      <div className="v-auth__card">
+        <h1 className="v-heading-l">Welcome to VORA</h1>
         {result.recoveryCodes ? (
           <RecoveryCodes codes={result.recoveryCodes} continueTo={result.home} />
         ) : (
@@ -78,9 +77,9 @@ export default function Invite({ loaderData }: Route.ComponentProps) {
 
   if (!loaderData.invitation) {
     return (
-      <div className={styles.card}>
-        <h1>This invitation isn't valid</h1>
-        <p className="muted">
+      <div className="v-auth__card">
+        <h1 className="v-heading-l">This invitation isn't valid</h1>
+        <p className="v-body v-secondary">
           Invitations expire after 3 days and work once. Ask the person who invited you to send a
           new one.
         </p>
@@ -90,15 +89,15 @@ export default function Invite({ loaderData }: Route.ComponentProps) {
 
   const fields = result && !result.ok ? result.fields : {};
   return (
-    <div className={styles.card}>
-      <h1>Accept your invitation</h1>
-      <p className="muted">
+    <div className="v-auth__card">
+      <h1 className="v-heading-l">Accept your invitation</h1>
+      <p className="v-body v-secondary">
         You're joining VORA as <strong>{loaderData.invitation.email}</strong>.
       </p>
       {result && !result.ok ? (
         <ErrorSummary message={result.message} fields={result.fields} />
       ) : null}
-      <Form method="post" className={styles.form}>
+      <Form method="post" className="v-form v-form--tight">
         <TextField
           name="name"
           label="Your name"

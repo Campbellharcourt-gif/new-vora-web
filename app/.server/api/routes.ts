@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { askVora } from "../ai/assistant";
 import { getSecurityOverview, revokeOtherSessions, revokeOwnSession } from "../auth/account";
 import { authorize } from "../auth/rbac";
 import type { KernelEnv } from "../kernel/types";
@@ -80,6 +81,31 @@ export function createApi() {
           : { status: "received" },
         201,
       );
+    } catch (error) {
+      return apiError(c, error);
+    }
+  });
+
+  // --- Ask VORA (public AI assistant; off unless the flag, setting and key are all set) ----
+  const askBody = z.object({
+    messages: z
+      .array(
+        z.object({
+          role: z.enum(["user", "assistant"]),
+          content: z.string().min(1).max(8000),
+        }),
+      )
+      .min(1)
+      .max(100),
+  });
+
+  api.post("/v1/ai/ask", async (c) => {
+    try {
+      const parsed = askBody.safeParse(await readJson(c, 64 * 1024));
+      if (!parsed.success)
+        throw errors.validation({ _form: "The request was not in the expected format." });
+      const answer = await askVora(c.get("server"), c.get("actor"), parsed.data.messages);
+      return c.json(answer, 200, { "Cache-Control": "no-store" });
     } catch (error) {
       return apiError(c, error);
     }

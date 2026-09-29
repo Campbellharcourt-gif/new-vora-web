@@ -2,12 +2,8 @@ import { ENQUIRY_STATUS_LABELS, ENQUIRY_STATUSES, type EnquiryStatus } from "@sh
 import { Form, Link } from "react-router";
 import { load, requirePermission } from "~/.server/guards";
 import { listEnquiries } from "~/.server/services/enquiries";
-import {
-  EmptyState,
-  formatDateTime,
-  PageHeading,
-  Panel,
-} from "~/components/workspace/WorkspaceShell";
+import { EnquiryStatusTag } from "~/components/workspace/status";
+import { formatDateTime, PageHeading, Panel } from "~/components/workspace/WorkspaceShell";
 import type { Route } from "./+types/enquiries";
 
 export async function loader({ context, request }: Route.LoaderArgs) {
@@ -29,73 +25,92 @@ export default function Enquiries({ loaderData }: Route.ComponentProps) {
   return (
     <>
       <PageHeading eyebrow="Admin" title="Enquiries" />
-      <Panel>
-        <Form
-          method="get"
-          className="stack"
-          style={{ display: "flex", gap: "var(--space-3)", alignItems: "end", flexWrap: "wrap" }}
-        >
-          <label style={{ display: "grid", gap: "var(--space-1)", fontSize: "var(--text-sm)" }}>
+      <Form method="get" className="v-filters" aria-label="Filter enquiries">
+        <div className="v-field">
+          <label className="v-label" htmlFor="filter-status">
             Status
+          </label>
+          <span className="v-selectwrap">
             <select
+              id="filter-status"
               name="status"
+              className="v-select"
               defaultValue={loaderData.status}
-              style={{ minHeight: "2.75rem", padding: "0 var(--space-3)" }}
             >
-              <option value="">All</option>
+              <option value="">All statuses</option>
               {ENQUIRY_STATUSES.map((s) => (
                 <option key={s} value={s}>
                   {ENQUIRY_STATUS_LABELS[s]}
                 </option>
               ))}
             </select>
-          </label>
-          <button type="submit" style={{ minHeight: "2.75rem", padding: "0 var(--space-4)" }}>
-            Filter
-          </button>
-        </Form>
+          </span>
+        </div>
+        <button type="submit" className="v-btn v-btn--secondary v-btn--s">
+          Filter
+        </button>
+      </Form>
+      <Panel flush>
         {loaderData.items.length === 0 ? (
-          <EmptyState>No enquiries{loaderData.status ? " with this status" : " yet"}.</EmptyState>
+          <div className="v-panel__body">
+            <p className="v-body">
+              No enquiries{loaderData.status ? " with this status" : " yet"}.
+            </p>
+          </div>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Reference</th>
-                <th scope="col">From</th>
-                <th scope="col">Project</th>
-                <th scope="col">Status</th>
-                <th scope="col">Received</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loaderData.items.map((e) => (
-                <tr key={e.id}>
-                  <td>
-                    <Link to={`/admin/enquiries/${e.id}`}>{e.reference}</Link>
-                    {e.spamScore >= 50 ? <span className="muted"> · possible spam</span> : null}
-                  </td>
-                  <td>
-                    {e.name}
-                    {e.company ? <span className="muted"> · {e.company}</span> : null}
-                  </td>
-                  <td>{e.projectTypes.join(", ")}</td>
-                  <td>{ENQUIRY_STATUS_LABELS[e.status]}</td>
-                  <td>{formatDateTime(e.createdAt)}</td>
+          <div className="v-tablewrap">
+            <table className="v-table v-table--stack">
+              <caption className="v-sr">Enquiries</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Reference</th>
+                  <th scope="col">From</th>
+                  <th scope="col">Project</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Received</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {loaderData.items.map((e) => (
+                  <tr key={e.id}>
+                    <td>
+                      <Link className="v-data" to={`/admin/enquiries/${e.id}`}>
+                        {e.reference}
+                      </Link>
+                      {e.spamScore >= 50 ? (
+                        <span className="v-body-s"> · possible spam</span>
+                      ) : null}
+                    </td>
+                    <td data-label="From">
+                      <span>
+                        {e.name}
+                        {e.company ? <span className="v-body-s"> · {e.company}</span> : null}
+                      </span>
+                    </td>
+                    <td data-label="Project">{e.projectTypes.join(", ")}</td>
+                    <td data-label="Status">
+                      <EnquiryStatusTag status={e.status} />
+                    </td>
+                    <td data-label="Received" className="v-data">
+                      {formatDateTime(e.createdAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-        {loaderData.nextBefore ? (
-          <p>
-            <Link
-              to={`?${new URLSearchParams({ ...(loaderData.status ? { status: loaderData.status } : {}), before: String(loaderData.nextBefore) })}`}
-            >
-              Older enquiries
-            </Link>
-          </p>
-        ) : null}
       </Panel>
+      {loaderData.nextBefore ? (
+        <nav className="v-pagination" aria-label="Pagination">
+          <Link
+            className="v-arrowlink"
+            to={`?${new URLSearchParams({ ...(loaderData.status ? { status: loaderData.status } : {}), before: String(loaderData.nextBefore) })}`}
+          >
+            <span>Older enquiries</span>
+          </Link>
+        </nav>
+      ) : null}
     </>
   );
 }

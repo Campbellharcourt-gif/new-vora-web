@@ -16,7 +16,6 @@ import { isAppError } from "~/.server/lib/errors";
 import { Button, ErrorSummary, Notice, TextField } from "~/components/ui/forms";
 import type { loader as rootLoader } from "~/root";
 import type { Route } from "./+types/login";
-import styles from "./auth.module.css";
 
 export async function loader({ context, request }: Route.LoaderArgs) {
   const { actor, pending, server } = load(context);
@@ -75,9 +74,9 @@ export async function action({ context, request }: Route.ActionArgs) {
       turnstileToken: formString(form, "cf-turnstile-response") || null,
     });
   } catch (error) {
-    // Password hashing unavailable (the PasswordHasher Durable Object — CP-3 · Free plan): answer
-    // 503 with a clear message on the form instead of the generic error page. Nothing was
-    // recorded against the account. Any other error is re-thrown exactly as before.
+    // Password hashing unavailable (native Argon2id queue full or failing): answer 503 with a clear
+    // message on the form instead of the generic error page. Nothing was recorded against the
+    // account. Any other error is re-thrown exactly as before.
     if (isAppError(error) && error.code === "service_unavailable") {
       return data<LoginFailure>(
         { message: error.publicMessage, fields: {}, challenge: false },
@@ -117,14 +116,14 @@ export default function Login({ loaderData }: Route.ComponentProps) {
   const showChallenge = Boolean(result?.challenge && loaderData.turnstileSiteKey);
 
   return (
-    <div className={styles.card}>
-      <h1>Sign in</h1>
+    <div className="v-auth__card">
+      <h1 className="v-heading-l">Sign in</h1>
       {params.get("reset") === "1" ? (
         <Notice tone="success">Your password was changed. Sign in with the new one.</Notice>
       ) : null}
       {params.get("signedout") === "1" ? <Notice>You've been signed out.</Notice> : null}
       {result ? <ErrorSummary message={result.message} fields={result.fields} /> : null}
-      <Form method="post" className={styles.form}>
+      <Form method="post" className="v-form v-form--tight">
         <input type="hidden" name="next" value={params.get("next") ?? ""} />
         <TextField
           name="email"
@@ -159,7 +158,7 @@ export default function Login({ loaderData }: Route.ComponentProps) {
         ) : null}
         <Button busy={busy}>{busy ? "Signing in…" : "Sign in"}</Button>
       </Form>
-      <p className={styles.links}>
+      <p className="v-auth__links">
         <Link to="/forgot-password">Forgot your password?</Link>
       </p>
     </div>

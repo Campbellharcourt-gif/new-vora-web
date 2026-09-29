@@ -1,7 +1,7 @@
 import { load } from "~/.server/guards";
 import { publicHealth, systemHealth } from "~/.server/services/health";
+import { Label, StatusIndicator, type StatusKind } from "~/components/vora/primitives";
 import type { Route } from "./+types/status";
-import styles from "./site.module.css";
 
 export async function loader({ context }: Route.LoaderArgs) {
   const health = publicHealth(await systemHealth(load(context).server));
@@ -23,35 +23,63 @@ const LABEL: Record<string, string> = {
   not_configured: "Not in use",
 };
 
+const KIND: Record<string, StatusKind> = {
+  operational: "ok",
+  degraded: "warn",
+  down: "down",
+  not_configured: "muted",
+};
+
+/** Status (§16.12): honest, coarse, minimal — the headline, the time, the component table. */
 export default function Status({ loaderData }: Route.ComponentProps) {
   return (
-    <section className={`container ${styles.page}`} aria-labelledby="status-title">
-      <header className={styles.pageHeader}>
-        <p className="label">Status</p>
-        <h1 id="status-title">
+    <section
+      className="v-container"
+      aria-labelledby="status-title"
+      style={{ paddingBottom: "var(--section-m)" }}
+    >
+      <header className="v-opening">
+        <Label>Status</Label>
+        <h1 id="status-title" className="v-display-m">
           {loaderData.overall === "operational"
             ? "All systems operational"
             : "Some systems are affected"}
         </h1>
-        <p className="muted">Checked {new Date(loaderData.checkedAt).toUTCString()}</p>
+        <p className="v-data v-secondary">
+          Checked{" "}
+          <time dateTime={new Date(loaderData.checkedAt).toISOString()}>
+            {new Date(loaderData.checkedAt).toUTCString()}
+          </time>
+        </p>
       </header>
-      <table>
-        <caption className="visually-hidden">Service status</caption>
-        <thead>
-          <tr>
-            <th scope="col">Service</th>
-            <th scope="col">State</th>
-          </tr>
-        </thead>
-        <tbody>
-          {loaderData.components.map((c) => (
-            <tr key={c.name}>
-              <td>{c.name}</td>
-              <td>{LABEL[c.state] ?? c.state}</td>
+      <div className="v-tablewrap" style={{ maxWidth: "48rem" }}>
+        <table className="v-table v-table--stack">
+          <caption className="v-sr">Service status</caption>
+          <thead>
+            <tr>
+              <th scope="col">Service</th>
+              <th scope="col">State</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {loaderData.components.map((c) => (
+              <tr key={c.name}>
+                <td>{c.name}</td>
+                <td data-label="State">
+                  <StatusIndicator kind={KIND[c.state] ?? "muted"}>
+                    {LABEL[c.state] ?? c.state}
+                  </StatusIndicator>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="v-refresh">
+        <a className="v-arrowlink" href="/status">
+          <span>Refresh</span>
+        </a>
+      </p>
     </section>
   );
 }

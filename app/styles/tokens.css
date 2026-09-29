@@ -1,61 +1,87 @@
 /*
- * VORA design tokens — PHASE 1 PROVISIONAL.
- * Semantic roles are final; the values are neutral placeholders until the logo, typefaces and
- * palette are confirmed in Phase 2. Components must use roles (e.g. --color-text), never raw values.
+ * VORA design tokens — docs/VORA-DESIGN-SYSTEM.md Appendix A (the source of truth), plus the
+ * four tokens the component bundle relies on (docs/design-system/tokens.json): --font-display,
+ * --radius-0, --radius-round and --shadow-focus-halo. Components use roles (e.g. --color-text),
+ * never raw palette values, except where the design system names a palette value on purpose
+ * (plates, scrims, the header over an image).
  */
 @layer tokens {
   :root {
-    /* Neutral stone/mist scale (provisional) */
-    --stone-950: #0c0d0c;
-    --stone-900: #141514;
-    --stone-850: #1b1c1b;
-    --stone-800: #242524;
-    --stone-700: #353634;
-    --stone-600: #4b4c49;
-    --stone-500: #6c6d69;
-    --stone-400: #8f8f8a;
-    --stone-300: #b4b3ad;
-    --stone-200: #d6d5cf;
-    --stone-100: #eceae4;
-    --stone-50: #f6f5f1;
+    /* Palette — Basalt → Mist */
+    --basalt-950: #0a0c0b;
+    --basalt-900: #111413;
+    --basalt-850: #171b1a;
+    --basalt-800: #1f2423;
+    --basalt-700: #2e3432;
+    --basalt-600: #454c4a;
+    --basalt-500: #646b68;
+    --basalt-400: #88908d;
+    --basalt-300: #aeb5b2;
+    --basalt-200: #d0d6d3;
+    --basalt-100: #e6eae8;
+    --basalt-50: #f2f4f3;
+    --white: #ffffff;
+    /* Palette — Lagoon (from the mark) */
+    --lagoon-100: #c7eec4;
+    --lagoon-200: #a4e1af;
+    --lagoon-300: #80d0a8;
+    --lagoon-400: #59bba1;
+    --lagoon-500: #479e93;
+    --lagoon-600: #33747a;
+    --lagoon-700: #2f6e73;
+    --lagoon-800: #235a5e;
+    --dusk-600: #3d3964; /* environment light and film only — never UI */
 
-    /* Semantic roles — public (dark, atmospheric) */
-    --color-bg: var(--stone-950);
-    --color-surface: var(--stone-900);
-    --color-surface-raised: var(--stone-850);
-    --color-text: var(--stone-100);
-    --color-text-muted: var(--stone-300);
-    --color-text-subtle: var(--stone-400);
-    --color-line: rgb(236 234 228 / 0.14);
-    --color-line-strong: rgb(236 234 228 / 0.32);
-    --color-focus: #f6f5f1;
+    /* Semantic roles — Basalt (public default) */
+    --color-bg: var(--basalt-950);
+    --color-surface: var(--basalt-900);
+    --color-surface-raised: var(--basalt-850);
+    --color-well: var(--basalt-800);
+    --color-text: var(--basalt-100);
+    --color-text-secondary: var(--basalt-300);
+    --color-text-muted: var(--basalt-400);
+    --color-line: rgb(230 234 232 / 0.14);
+    --color-line-strong: rgb(230 234 232 / 0.32);
+    --color-line-control: rgb(230 234 232 / 0.4);
+    --color-accent: var(--lagoon-300);
+    --color-focus: var(--lagoon-300);
+    --color-action-bg: var(--basalt-100);
+    --color-action-bg-hover: var(--white);
+    --color-action-bg-pressed: var(--basalt-200);
+    --color-action-text: var(--basalt-950);
+    --color-disabled-bg: var(--basalt-700);
+    --color-disabled-text: var(--basalt-400);
     --color-danger: #ff8a7a;
     --color-success: #9fd8b0;
     --color-warning: #f0cf8a;
-    --color-action-bg: var(--stone-100);
-    --color-action-text: var(--stone-950);
+    --color-info: var(--lagoon-300);
+    --scrim-bottom: linear-gradient(to top, rgb(10 12 11 / 0.72), rgb(10 12 11 / 0));
+    --scrim-top: linear-gradient(to bottom, rgb(10 12 11 / 0.4), rgb(10 12 11 / 0));
 
-    /* Typography (system stacks until licensed faces are chosen) */
-    --font-sans:
-      ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    /* Typography. "Archivo SemiExpanded" is the design system's static semi-expanded cut
+       (tokens.json); the variable Archivo file carries the same width on its wdth axis. */
+    --font-display:
+      "Archivo SemiExpanded", "Archivo SemiExpanded Fallback", "Archivo", ui-sans-serif, system-ui,
       sans-serif;
-    --font-serif: ui-serif, "Iowan Old Style", "Apple Garamond", Georgia, serif;
-    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --font-sans: "Archivo", "Archivo Fallback", ui-sans-serif, system-ui, sans-serif;
+    --font-serif: "Newsreader", "Newsreader Fallback", ui-serif, Georgia, serif;
+    --font-mono: "DM Mono", "DM Mono Fallback", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --type-display-xl: clamp(3.25rem, 1.44rem + 8.05vw, 10rem);
+    --type-display-l: clamp(2.75rem, 1.61rem + 5.07vw, 6.5rem);
+    --type-display-m: clamp(2.25rem, 1.61rem + 2.84vw, 4.5rem);
+    --type-heading-l: clamp(1.75rem, 1.39rem + 1.62vw, 3rem);
+    --type-heading-m: clamp(1.375rem, 1.23rem + 0.65vw, 1.875rem);
+    --type-heading-s: clamp(1.125rem, 1.09rem + 0.19vw, 1.25rem);
+    --type-lead: clamp(1.125rem, 0.99rem + 0.56vw, 1.5rem);
+    --type-body: clamp(1rem, 0.98rem + 0.09vw, 1.0625rem);
+    --type-body-s: 0.9375rem;
+    --type-ui: 0.9375rem;
+    --type-label: 0.75rem;
+    --type-data: 0.8125rem;
+    --type-quote: clamp(1.625rem, 1.25rem + 1.67vw, 2.75rem);
+    --tracking-label: 0.14em;
 
-    /* Fluid type scale (min at 360px → max at 1440px) */
-    --text-xs: clamp(0.75rem, 0.73rem + 0.1vw, 0.8125rem);
-    --text-sm: clamp(0.875rem, 0.85rem + 0.1vw, 0.9375rem);
-    --text-base: clamp(1rem, 0.97rem + 0.15vw, 1.0625rem);
-    --text-lg: clamp(1.125rem, 1.07rem + 0.25vw, 1.25rem);
-    --text-xl: clamp(1.375rem, 1.25rem + 0.55vw, 1.75rem);
-    --text-2xl: clamp(1.75rem, 1.5rem + 1.1vw, 2.5rem);
-    --text-3xl: clamp(2.25rem, 1.8rem + 2vw, 3.75rem);
-    --leading-tight: 1.1;
-    --leading-snug: 1.3;
-    --leading-body: 1.6;
-    --tracking-label: 0.18em;
-
-    /* Spacing (4px base) */
+    /* Spacing (4 px base) */
     --space-1: 0.25rem;
     --space-2: 0.5rem;
     --space-3: 0.75rem;
@@ -66,50 +92,122 @@
     --space-8: 4rem;
     --space-9: 6rem;
     --space-10: 8rem;
+    --space-11: 11rem;
+    --space-12: 15rem;
+    --section-s: clamp(4rem, 2.94rem + 4.72vw, 7rem);
+    --section-m: clamp(6rem, 4.25rem + 7.78vw, 11rem);
+    --section-l: clamp(8rem, 5.17rem + 12.6vw, 16rem);
 
     /* Layout */
-    --gutter: clamp(1rem, 0.6rem + 2vw, 2.5rem);
-    --measure: 64ch;
+    --page-margin: clamp(1.25rem, 0.53rem + 3.2vw, 3.5rem);
+    --grid-gap: clamp(1rem, 0.72rem + 1.25vw, 1.75rem);
     --container: 88rem;
-    --radius-s: 2px;
-    --radius-m: 4px;
+    --container-wide: 110rem;
+    --container-form: 40rem;
+    --container-auth: 26rem;
+    --measure: 64ch;
+    --header-h: 60px; /* 64px from 768px, 72px from 1024px (below) */
+    --station-h: max(100svh, 36rem);
 
-    /* Motion (see docs/01-ARCHITECTURE.md §11.4) */
+    /* Shape and depth */
+    --radius-0: 0;
+    --radius-s: 2px;
+    --radius-round: 50%; /* radio buttons only — the one sanctioned circle */
+    --shadow-popover: 0 8px 24px rgb(10 12 11 / 0.14); /* portals only */
+    --shadow-focus-halo: 0 0 0 1px #0a0c0b; /* keeps the focus ring legible on imagery */
+
+    /* Motion */
+    --dur-micro: 120ms;
+    --dur-fast: 200ms;
+    --dur-base: 320ms;
+    --dur-medium: 560ms;
+    --dur-slow: 900ms;
+    --dur-cinematic: 1400ms;
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-    --duration-fast: 160ms;
-    --duration-base: 320ms;
-    --duration-slow: 720ms;
+    --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
 
-    /* Breakpoints (reference only; media queries cannot read custom properties) */
-    --bp-tablet: 48rem; /* 768px */
-    --bp-laptop: 64rem; /* 1024px */
-    --bp-desktop: 90rem; /* 1440px */
+    color-scheme: dark;
   }
 
-  /* Workspace theme (admin, account, portals): light, dense, high legibility. */
+  @media (min-width: 768px) {
+    :root {
+      --header-h: 64px;
+    }
+  }
+  @media (min-width: 1024px) {
+    :root {
+      --header-h: 72px;
+    }
+  }
+
+  /* Light roles: Mist chapters, legal pages, and the workspace */
+  [data-theme="mist"],
   [data-theme="workspace"] {
-    --color-bg: var(--stone-50);
-    --color-surface: #ffffff;
-    --color-surface-raised: #ffffff;
-    --color-text: var(--stone-950);
-    --color-text-muted: var(--stone-600);
-    --color-text-subtle: var(--stone-500);
-    --color-line: rgb(12 13 12 / 0.12);
-    --color-line-strong: rgb(12 13 12 / 0.28);
-    --color-focus: var(--stone-950);
+    --color-bg: var(--basalt-50);
+    --color-surface: var(--white);
+    --color-surface-raised: var(--white);
+    --color-well: var(--basalt-100);
+    --color-text: var(--basalt-950);
+    --color-text-secondary: #3a413e;
+    --color-text-muted: #5a625f;
+    --color-line: rgb(10 12 11 / 0.12);
+    --color-line-strong: rgb(10 12 11 / 0.28);
+    --color-line-control: rgb(10 12 11 / 0.52);
+    --color-accent: var(--lagoon-800);
+    --color-focus: var(--lagoon-800);
+    --color-action-bg: var(--basalt-950);
+    --color-action-bg-hover: var(--basalt-800);
+    --color-action-bg-pressed: var(--basalt-800);
+    --color-action-text: var(--basalt-50);
+    --color-disabled-bg: var(--basalt-100);
+    --color-disabled-text: var(--basalt-500);
     --color-danger: #b3261e;
     --color-success: #1e6b3a;
     --color-warning: #7a5600;
-    --color-action-bg: var(--stone-950);
-    --color-action-text: var(--stone-50);
+    --color-info: var(--lagoon-800);
+    color-scheme: light;
   }
 
+  /* Basalt roles restored inside a light area (e.g. a dark plate inside a Mist chapter). */
+  [data-theme="basalt"] {
+    --color-bg: var(--basalt-950);
+    --color-surface: var(--basalt-900);
+    --color-surface-raised: var(--basalt-850);
+    --color-well: var(--basalt-800);
+    --color-text: var(--basalt-100);
+    --color-text-secondary: var(--basalt-300);
+    --color-text-muted: var(--basalt-400);
+    --color-line: rgb(230 234 232 / 0.14);
+    --color-line-strong: rgb(230 234 232 / 0.32);
+    --color-line-control: rgb(230 234 232 / 0.4);
+    --color-accent: var(--lagoon-300);
+    --color-focus: var(--lagoon-300);
+    --color-action-bg: var(--basalt-100);
+    --color-action-bg-hover: var(--white);
+    --color-action-bg-pressed: var(--basalt-200);
+    --color-action-text: var(--basalt-950);
+    --color-disabled-bg: var(--basalt-700);
+    --color-disabled-text: var(--basalt-400);
+    --color-danger: #ff8a7a;
+    --color-success: #9fd8b0;
+    --color-warning: #f0cf8a;
+    --color-info: var(--lagoon-300);
+    color-scheme: dark;
+  }
+
+  /* T0 — reduced motion. The OS setting only: the footer toggle and its `vora_motion` cookie
+     wait for approval (Appendix C), so `data-motion` is set by script for Save-Data alone. */
   @media (prefers-reduced-motion: reduce) {
-    :root {
-      --duration-fast: 0ms;
-      --duration-base: 0ms;
-      --duration-slow: 0ms;
+    :root:not([data-motion="full"]) {
+      --dur-medium: 0ms;
+      --dur-slow: 0ms;
+      --dur-cinematic: 0ms;
     }
+  }
+  :root[data-motion="reduced"] {
+    --dur-medium: 0ms;
+    --dur-slow: 0ms;
+    --dur-cinematic: 0ms;
   }
 }

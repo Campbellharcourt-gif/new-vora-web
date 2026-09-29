@@ -12,7 +12,6 @@ import { verifySignInRecoveryCode } from "~/.server/auth/login";
 import { formString, load, safeNext } from "~/.server/guards";
 import { Button, ErrorSummary, TextField } from "~/components/ui/forms";
 import type { Route } from "./+types/login-recovery";
-import styles from "./auth.module.css";
 
 export async function loader({ context }: Route.LoaderArgs) {
   const { pending, actor } = load(context);
@@ -57,11 +56,13 @@ export default function LoginRecovery() {
   const navigation = useNavigation();
   const [params] = useSearchParams();
   return (
-    <div className={styles.card}>
-      <h1>Use a recovery code</h1>
-      <p className="muted">Each recovery code works once. We'll email you when one is used.</p>
+    <div className="v-auth__card">
+      <h1 className="v-heading-l">Use a recovery code</h1>
+      <p className="v-body v-secondary">
+        Each recovery code works once. We'll email you when one is used.
+      </p>
       {result ? <ErrorSummary message={result.message} /> : null}
-      <Form method="post" className={styles.form}>
+      <Form method="post" className="v-form v-form--tight">
         <input type="hidden" name="next" value={params.get("next") ?? ""} />
         <TextField
           name="code"
@@ -70,10 +71,11 @@ export default function LoginRecovery() {
           maxLength={16}
           spellCheck={false}
           required
+          code
         />
         <Button busy={navigation.state === "submitting"}>Sign in</Button>
       </Form>
-      <p className={styles.links}>
+      <p className="v-auth__links">
         <Link to="/login/verify">Back to email code</Link>
       </p>
     </div>

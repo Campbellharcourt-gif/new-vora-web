@@ -12,7 +12,6 @@ import { homePathFor, resendSignInCode, verifySignInCode } from "~/.server/auth/
 import { formString, load, safeNext } from "~/.server/guards";
 import { Button, ErrorSummary, Notice, TextField } from "~/components/ui/forms";
 import type { Route } from "./+types/login-verify";
-import styles from "./auth.module.css";
 
 export async function loader({ context }: Route.LoaderArgs) {
   const { pending, actor } = load(context);
@@ -96,9 +95,9 @@ export default function LoginVerify({ loaderData }: Route.ComponentProps) {
   const busy = navigation.state === "submitting";
   const next = params.get("next") ?? "";
   return (
-    <div className={styles.card}>
-      <h1>Check your email</h1>
-      <p className="muted">
+    <div className="v-auth__card">
+      <h1 className="v-heading-l">Check your email</h1>
+      <p className="v-body v-secondary">
         We sent a 6-digit code to <strong>{loaderData.maskedEmail}</strong>. It expires in 10
         minutes.
       </p>
@@ -109,7 +108,7 @@ export default function LoginVerify({ loaderData }: Route.ComponentProps) {
       ) : null}
       {result?.ok ? <Notice tone="success">{result.message}</Notice> : null}
       {result && !result.ok ? <ErrorSummary message={result.message} /> : null}
-      <Form method="post" className={styles.form}>
+      <Form method="post" className="v-form v-form--tight">
         <input type="hidden" name="next" value={next} />
         <TextField
           name="code"
@@ -119,6 +118,7 @@ export default function LoginVerify({ loaderData }: Route.ComponentProps) {
           maxLength={7}
           required
           autoFocus
+          code
           error={result && !result.ok ? result.fields.code : undefined}
         />
         <Button busy={busy}>Verify and sign in</Button>
@@ -129,7 +129,7 @@ export default function LoginVerify({ loaderData }: Route.ComponentProps) {
           Send a new code
         </Button>
       </Form>
-      <p className={styles.links}>
+      <p className="v-auth__links">
         <Link to={`/login/recovery${next ? `?next=${encodeURIComponent(next)}` : ""}`}>
           Use a recovery code instead
         </Link>

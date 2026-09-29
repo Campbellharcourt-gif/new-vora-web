@@ -16,15 +16,21 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 export default function AccountOverview({ loaderData }: Route.ComponentProps) {
   return (
     <>
-      <PageHeading eyebrow="Account" title={loaderData.name} description={loaderData.email} />
-      <Panel title="Access">
-        <p>
-          Roles: <strong>{loaderData.roles.join(", ") || "None"}</strong>
-        </p>
-        {loaderData.privileged ? (
-          <p className="muted">Your role requires two-step verification each time you sign in.</p>
-        ) : null}
-      </Panel>
+      <PageHeading eyebrow="Account" title={loaderData.name} />
+      <p className="v-data v-secondary">{loaderData.email}</p>
+      <div className="v-panels v-panels--two">
+        <Panel title="Access">
+          <dl className="v-dl">
+            <dt>Roles</dt>
+            <dd>{loaderData.roles.join(", ") || "None"}</dd>
+          </dl>
+          {loaderData.privileged ? (
+            <p className="v-body-s">
+              Your role requires two-step verification each time you sign in.
+            </p>
+          ) : null}
+        </Panel>
+      </div>
     </>
   );
 }

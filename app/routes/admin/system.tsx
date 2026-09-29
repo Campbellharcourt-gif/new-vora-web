@@ -1,5 +1,6 @@
 import { load, requirePermission } from "~/.server/guards";
 import { systemHealth } from "~/.server/services/health";
+import { HealthTag } from "~/components/workspace/status";
 import { formatDateTime, PageHeading, Panel } from "~/components/workspace/WorkspaceShell";
 import type { Route } from "./+types/system";
 
@@ -24,29 +25,47 @@ export default function System({ loaderData }: Route.ComponentProps) {
       <PageHeading
         eyebrow="Admin"
         title="System"
-        description={`Environment: ${loaderData.appEnv} · Email transport: ${loaderData.emailTransport} · Checked ${formatDateTime(Date.parse(health.checkedAt))}`}
+        actions={
+          <HealthTag
+            state={health.overall}
+            label={`Overall: ${STATE[health.overall] ?? health.overall}`}
+          />
+        }
       />
-      <Panel title={`Overall: ${STATE[health.overall] ?? health.overall}`}>
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Component</th>
-              <th scope="col">State</th>
-              <th scope="col">Latency</th>
-              <th scope="col">Detail</th>
-            </tr>
-          </thead>
-          <tbody>
-            {health.components.map((c) => (
-              <tr key={c.name}>
-                <td>{c.name}</td>
-                <td>{STATE[c.state] ?? c.state}</td>
-                <td>{c.latencyMs !== undefined ? `${c.latencyMs} ms` : "—"}</td>
-                <td>{c.detail ?? "—"}</td>
+      <p className="v-data v-secondary">
+        Environment: {loaderData.appEnv} · Email transport: {loaderData.emailTransport} · Checked{" "}
+        {formatDateTime(Date.parse(health.checkedAt))}
+      </p>
+      <Panel title="Health" flush>
+        <div className="v-tablewrap">
+          <table className="v-table v-table--stack">
+            <caption className="v-sr">Component health</caption>
+            <thead>
+              <tr>
+                <th scope="col">Component</th>
+                <th scope="col">State</th>
+                <th scope="col" className="num">
+                  Latency
+                </th>
+                <th scope="col">Detail</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {health.components.map((c) => (
+                <tr key={c.name}>
+                  <td>{c.name}</td>
+                  <td data-label="State">
+                    <HealthTag state={c.state} label={STATE[c.state] ?? c.state} />
+                  </td>
+                  <td data-label="Latency" className="num">
+                    {c.latencyMs !== undefined ? `${c.latencyMs} ms` : "—"}
+                  </td>
+                  <td data-label="Detail">{c.detail ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Panel>
     </>
   );

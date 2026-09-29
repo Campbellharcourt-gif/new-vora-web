@@ -4,7 +4,6 @@ import { requestPasswordResetInBackground } from "~/.server/auth/password-reset"
 import { formString, load } from "~/.server/guards";
 import { Button, ErrorSummary, Notice, TextField } from "~/components/ui/forms";
 import type { Route } from "./+types/forgot-password";
-import styles from "./auth.module.css";
 
 export async function action({ context, request }: Route.ActionArgs) {
   const form = await request.formData();
@@ -25,8 +24,8 @@ export default function ForgotPassword() {
   const result = useActionData<typeof action>();
   const navigation = useNavigation();
   return (
-    <div className={styles.card}>
-      <h1>Reset your password</h1>
+    <div className="v-auth__card">
+      <h1 className="v-heading-l">Reset your password</h1>
       {result?.sent ? (
         <Notice tone="success">
           If an account exists for that email, we've sent a link to reset the password. It expires
@@ -34,15 +33,17 @@ export default function ForgotPassword() {
         </Notice>
       ) : (
         <>
-          <p className="muted">Enter your account email and we'll send you a reset link.</p>
+          <p className="v-body v-secondary">
+            Enter your account email and we'll send you a reset link.
+          </p>
           {result && !result.sent ? <ErrorSummary message={result.message} /> : null}
-          <Form method="post" className={styles.form}>
+          <Form method="post" className="v-form v-form--tight">
             <TextField name="email" label="Email" type="email" autoComplete="email" required />
             <Button busy={navigation.state === "submitting"}>Send reset link</Button>
           </Form>
         </>
       )}
-      <p className={styles.links}>
+      <p className="v-auth__links">
         <Link to="/login">Back to sign in</Link>
       </p>
     </div>

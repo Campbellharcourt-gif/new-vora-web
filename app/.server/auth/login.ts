@@ -105,9 +105,9 @@ export async function signIn(
     }
   }
 
-  // Argon2id runs in the PasswordHasher Durable Object where one is bound (CP-3 · Free plan). If it
-  // is unavailable this throws a 503 BEFORE any attempt is recorded — fail closed, and no failed
-  // sign-in is counted against the account.
+  // Argon2id runs natively (node:crypto) behind a bounded queue. If hashing is unavailable (queue
+  // full, timeout, derivation error) this throws a 503 BEFORE any attempt is recorded — fail
+  // closed, and no failed sign-in is counted against the account.
   const passwords = passwordHashing(ctx);
   let passwordOk = false;
   if (user?.passwordHash) {

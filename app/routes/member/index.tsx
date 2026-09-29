@@ -7,7 +7,10 @@ export default function MemberHome() {
       <PageHeading eyebrow="Members" title="Welcome" />
       <EmptyState>
         Member features will appear here as they launch. Manage your sign-in and sessions in{" "}
-        <Link to="/account/security">account security</Link>.
+        <Link className="v-link" to="/account/security">
+          account security
+        </Link>
+        .
       </EmptyState>
     </>
   );

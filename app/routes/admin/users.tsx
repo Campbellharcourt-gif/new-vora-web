@@ -6,6 +6,7 @@ import { canGrantRole } from "~/.server/auth/rbac";
 import { failureFrom, formString, load, requirePermission } from "~/.server/guards";
 import { listUsers } from "~/.server/services/users";
 import { Button, ChoiceGroup, ErrorSummary, Notice, TextField } from "~/components/ui/forms";
+import { StatusIndicator, type StatusKind } from "~/components/vora/primitives";
 import { formatDateTime, PageHeading, Panel } from "~/components/workspace/WorkspaceShell";
 import type { Route } from "./+types/users";
 
@@ -80,34 +81,45 @@ export default function Users({ loaderData }: Route.ComponentProps) {
         <ErrorSummary message={result.message} fields={result.fields} />
       ) : null}
 
-      <Panel title="People">
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Email</th>
-              <th scope="col">Roles</th>
-              <th scope="col">Status</th>
-              <th scope="col">Last sign-in</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loaderData.users.map((u) => (
-              <tr key={u.id}>
-                <td>{u.name}</td>
-                <td style={{ overflowWrap: "anywhere" }}>{u.email}</td>
-                <td>{u.roles.join(", ") || "—"}</td>
-                <td>{u.status}</td>
-                <td>{formatDateTime(u.lastLoginAt)}</td>
+      <Panel title="People" flush>
+        <div className="v-tablewrap">
+          <table className="v-table v-table--stack">
+            <caption className="v-sr">People</caption>
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Email</th>
+                <th scope="col">Roles</th>
+                <th scope="col">Status</th>
+                <th scope="col">Last sign-in</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {loaderData.users.map((u) => (
+                <tr key={u.id}>
+                  <td>{u.name}</td>
+                  <td data-label="Email" style={{ overflowWrap: "anywhere" }}>
+                    {u.email}
+                  </td>
+                  <td data-label="Roles">{u.roles.join(", ") || "—"}</td>
+                  <td data-label="Status">
+                    <StatusIndicator kind={USER_STATUS_KIND[u.status] ?? "muted"}>
+                      {u.status}
+                    </StatusIndicator>
+                  </td>
+                  <td data-label="Last sign-in" className="v-data">
+                    {formatDateTime(u.lastLoginAt)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Panel>
 
       {loaderData.grantable.length > 0 ? (
         <Panel title="Invite someone">
-          <Form method="post" className="stack" style={{ maxWidth: "32rem" }}>
+          <Form method="post" className="v-form v-form--tight">
             <TextField
               name="email"
               label="Email"
@@ -124,14 +136,25 @@ export default function Users({ loaderData }: Route.ComponentProps) {
               options={loaderData.grantable}
               error={result && !result.ok ? result.fields.roles : undefined}
             />
-            <p className="muted" style={{ fontSize: "var(--text-sm)" }}>
+            <p className="v-body-s">
               You can only grant roles below your own. Staff, Manager, Admin and Owner accounts must
               use two-step verification.
             </p>
-            <Button busy={busy}>Send invitation</Button>
+            <div>
+              <Button busy={busy} size="s">
+                Send invitation
+              </Button>
+            </div>
           </Form>
         </Panel>
       ) : null}
     </>
   );
 }
+
+const USER_STATUS_KIND: Record<string, StatusKind> = {
+  active: "ok",
+  invited: "info",
+  suspended: "warn",
+  deactivated: "muted",
+};

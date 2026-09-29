@@ -1,0 +1,75 @@
+/*
+ * Self-hosted type (design system §2.1; the files and OFL licences are in app/assets/fonts,
+ * copied unchanged from docs/design-system/fonts). Latin subsets only; no third-party requests.
+ * Arrows are not in the subsets, so arrows are SVG icons.
+ *
+ * `font-display: swap` plus metric-matched fallbacks (`size-adjust`, `ascent-override`,
+ * `descent-override`) so text keeps its place when the web fonts arrive. The overrides were
+ * computed from the font files' own metrics against Arial / Times New Roman Italic / Courier
+ * New (their metric-compatible Liberation equivalents), weighted by English letter frequency.
+ */
+@font-face {
+  font-family: "Archivo";
+  src: url("../assets/fonts/Archivo-Variable-Latin.woff2") format("woff2");
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Archivo SemiExpanded";
+  src: url("../assets/fonts/Archivo-SemiExpanded-Latin.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Newsreader";
+  src: url("../assets/fonts/Newsreader-Italic-Latin.woff2") format("woff2");
+  font-weight: 300 500;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "DM Mono";
+  src: url("../assets/fonts/DMMono-Regular-Latin.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Archivo Fallback";
+  src: local("Arial"), local("ArialMT"), local("Liberation Sans"), local("Helvetica");
+  size-adjust: 98.08%;
+  ascent-override: 89.52%;
+  descent-override: 21.41%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Archivo SemiExpanded Fallback";
+  src: local("Arial"), local("ArialMT"), local("Liberation Sans"), local("Helvetica");
+  size-adjust: 110.32%;
+  ascent-override: 79.58%;
+  descent-override: 19.04%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Newsreader Fallback";
+  src:
+    local("Times New Roman Italic"), local("TimesNewRomanPS-ItalicMT"),
+    local("Liberation Serif Italic"), local("Georgia Italic");
+  font-style: italic;
+  size-adjust: 96.27%;
+  ascent-override: 76.35%;
+  descent-override: 27.53%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "DM Mono Fallback";
+  src: local("Courier New"), local("CourierNewPSMT"), local("Liberation Mono"), local("Courier");
+  size-adjust: 99.98%;
+  ascent-override: 99.22%;
+  descent-override: 31.01%;
+  line-gap-override: 0%;
+}
