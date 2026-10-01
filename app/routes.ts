@@ -36,6 +36,7 @@ export default [
     route("enquiries", "routes/admin/enquiries.tsx"),
     route("enquiries/:id", "routes/admin/enquiry.tsx"),
     route("clients", "routes/admin/clients.tsx"),
+    route("engagements", "routes/admin/engagements.tsx"),
     route("projects", "routes/admin/projects.tsx"),
     route("services", "routes/admin/services.tsx"),
     route("content", "routes/admin/content.tsx"),
