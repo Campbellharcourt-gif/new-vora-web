@@ -1,0 +1,11 @@
+import { data, Form, useActionData, useNavigation } from "react-router";
+import { actionError, formString, load, requirePermission } from "~/.server/guards";
+import { updateProject } from "~/.server/services/admin-crud";
+import { schema } from "~/.server/db/client";
+import { eq } from "drizzle-orm";
+import { Button, ErrorSummary, TextField } from "~/components/ui/forms";
+import { PageHeading, Panel } from "~/components/workspace/WorkspaceShell";
+import type { Route } from "./+types/project";
+export async function loader({context,request,params}:Route.LoaderArgs){const actor=await requirePermission(context,request,"projects.view");const row=await load(context).server.db.select().from(schema.projects).where(eq(schema.projects.id,params.id)).get();if(!row)throw new Response("Not found",{status:404});return{row}}
+export async function action({context,request,params}:Route.ActionArgs){const actor=await requirePermission(context,request,"projects.edit");try{await updateProject(load(context).server,actor,params.id,Object.fromEntries(await request.formData()));return data({ok:true,message:"Project saved."})}catch(e){return actionError(e)}}
+export default function Project({loaderData}:Route.ComponentProps){const r=useActionData<typeof action>();const busy=useNavigation().state==="submitting";const p=loaderData.row;return <><PageHeading eyebrow="Admin / Projects" title={p.title}/>{r?.ok?<p className="v-notice v-notice--success">{r.message}</p>:null}{r&&!r.ok?<ErrorSummary message={r.message} fields={r.fields}/>:null}<Panel title="Working copy"><Form method="post" className="v-form v-form--tight"><TextField name="title" label="Title" defaultValue={p.title} required/><TextField name="slug" label="Slug" defaultValue={p.slug} required/><TextField name="category" label="Category" defaultValue={p.category ?? ""}/><TextField name="summary" label="Summary" defaultValue={p.summary ?? ""}/><TextField name="year" label="Year" type="number" defaultValue={p.year ?? ""}/><TextField name="clientName" label="Client name" defaultValue={p.clientName ?? ""}/><TextField name="externalUrl" label="External URL" defaultValue={p.externalUrl ?? ""}/><TextField name="body" label="Content blocks JSON" defaultValue={JSON.stringify(p.body)}/><Button busy={busy} size="s">Save draft</Button></Form></Panel></>}
