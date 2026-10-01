@@ -11,6 +11,13 @@ export async function loader({ context, request }: Route.LoaderArgs) {
     nav: [
       { to: "/admin", label: "Dashboard", end: true },
       ...(has("enquiries.view") ? [{ to: "/admin/enquiries", label: "Enquiries" }] : []),
+      ...(has("clients.view") ? [{ to: "/admin/clients", label: "Clients" }] : []),
+      ...(has("projects.view") ? [{ to: "/admin/projects", label: "Projects" }] : []),
+      ...(has("services.view") ? [{ to: "/admin/services", label: "Services" }] : []),
+      ...(has("pages.view") ? [{ to: "/admin/content", label: "Content" }] : []),
+      ...(has("settings.view") ? [{ to: "/admin/settings", label: "Settings" }] : []),
+      ...(has("security.view") ? [{ to: "/admin/security", label: "Security" }] : []),
+      ...(has("audit.view") ? [{ to: "/admin/audit", label: "Audit Log" }] : []),
       ...(has("users.view") ? [{ to: "/admin/users", label: "Users" }] : []),
       ...(has("system.status") ? [{ to: "/admin/system", label: "System" }] : []),
     ],
