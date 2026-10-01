@@ -166,7 +166,7 @@ export async function revokeOtherSessions(ctx:ServerContext,actorInput:Actor|nul
 
 export async function listAdminEngagements(ctx:ServerContext,actorInput:Actor|null){
   await authorize(ctx,actorInput,"engagements.view");
-  return ctx.db.select({id:schema.engagements.id,name:schema.engagements.name,status:schema.engagements.status,orgName:schema.clientOrgs.name,orgId:schema.engagements.orgId,startDate:schema.engagements.startDate,targetDate:schema.engagements.targetDate,updatedAt:schema.engagements.updatedAt})
+  return ctx.db.select({id:schema.engagements.id,name:schema.engagements.name,summary:schema.engagements.summary,status:schema.engagements.status,orgName:schema.clientOrgs.name,orgId:schema.engagements.orgId,startDate:schema.engagements.startDate,targetDate:schema.engagements.targetDate,updatedAt:schema.engagements.updatedAt})
     .from(schema.engagements).innerJoin(schema.clientOrgs,eq(schema.clientOrgs.id,schema.engagements.orgId)).orderBy(desc(schema.engagements.updatedAt)).all();
 }
 
