@@ -169,3 +169,23 @@ export async function listAdminEngagements(ctx:ServerContext,actorInput:Actor|nu
   return ctx.db.select({id:schema.engagements.id,name:schema.engagements.name,status:schema.engagements.status,orgName:schema.clientOrgs.name,orgId:schema.engagements.orgId,startDate:schema.engagements.startDate,targetDate:schema.engagements.targetDate,updatedAt:schema.engagements.updatedAt})
     .from(schema.engagements).innerJoin(schema.clientOrgs,eq(schema.clientOrgs.id,schema.engagements.orgId)).orderBy(desc(schema.engagements.updatedAt)).all();
 }
+
+
+export async function updatePage(ctx:ServerContext,actorInput:Actor|null,id:string,input:Record<string,unknown>){
+  const actor=await authorize(ctx,actorInput,"pages.edit");
+  const current=await ctx.db.select().from(schema.pages).where(eq(schema.pages.id,id)).get(); if(!current||current.archivedAt) throw errors.notFound();
+  const v=z.object({key, title:text(160), intro:z.string().trim().max(500).nullable().optional(), body:z.preprocess(parseBody,contentBody).default([]), seoTitle:z.string().trim().max(160).nullable().optional(), seoDescription:z.string().trim().max(320).nullable().optional()}).safeParse(input);
+  if(!v.success) throw errors.validation({form:v.error.issues[0]?.message??"Invalid page."});
+  const d=v.data, now=ctx.clock.now();
+  await ctx.db.update(schema.pages).set({key:d.key,title:d.title,intro:d.intro??null,body:d.body,seoTitle:d.seoTitle??null,seoDescription:d.seoDescription??null,hasUnpublishedChanges:true,updatedBy:actor.userId,updatedAt:now}).where(eq(schema.pages.id,id)).run();
+  await writeAudit(ctx,actor,{action:"pages.update",targetType:"page",targetId:id,summary:`Updated page ${d.title}`});
+}
+export async function publishPage(ctx:ServerContext,actorInput:Actor|null,id:string){
+  const actor=await authorize(ctx,actorInput,"pages.publish");
+  const row=await ctx.db.select().from(schema.pages).where(eq(schema.pages.id,id)).get(); if(!row) throw errors.notFound();
+  await publishVersion(ctx,actor,"page",id,{...row,publishedVersionId:undefined});
+}
+export async function listAdminPages(ctx:ServerContext,actorInput:Actor|null){
+  await authorize(ctx,actorInput,"pages.view");
+  return ctx.db.select({id:schema.pages.id,key:schema.pages.key,title:schema.pages.title,status:schema.pages.status,hasUnpublishedChanges:schema.pages.hasUnpublishedChanges,updatedAt:schema.pages.updatedAt}).from(schema.pages).where(isNull(schema.pages.archivedAt)).orderBy(desc(schema.pages.updatedAt)).all();
+}
