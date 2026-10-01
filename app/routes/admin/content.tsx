@@ -1,32 +1,10 @@
-import { load, requirePermission } from "~/.server/guards";
-import { contentOverview } from "~/.server/services/admin-workspace";
-import { PageHeading, Panel } from "~/components/workspace/WorkspaceShell";
+import { data, Form, useActionData, useNavigation } from "react-router";
+import { actionError, formString, load, requirePermission } from "~/.server/guards";
+import { listAdminPages, publishPage, updatePage } from "~/.server/services/admin-crud";
+import { Button, ErrorSummary, TextField } from "~/components/ui/forms";
+import { formatDateTime, PageHeading, Panel } from "~/components/workspace/WorkspaceShell";
 import type { Route } from "./+types/content";
 
-export async function loader({ context, request }: Route.LoaderArgs) {
-  return { counts: await contentOverview(load(context).server, await requirePermission(context, request, "admin.access")) };
-}
-
-export default function Content({ loaderData }: Route.ComponentProps) {
-  const modules = [
-    ["Projects", loaderData.counts.projects, "/admin/projects"],
-    ["Services", loaderData.counts.services, "/admin/services"],
-    ["Pages", loaderData.counts.pages, null],
-  ] as const;
-  return (
-    <>
-      <PageHeading eyebrow="Admin" title="Content" description="One place to see the publishable surface of VORA." />
-      <div className="v-panels v-panels--three">
-        {modules.map(([label, value, to]) => (
-          <Panel key={label} title={label}>
-            <p className="v-display-m">{value ?? "—"}</p>
-            {to ? <a className="v-arrowlink" href={to}><span>Open</span></a> : <p className="v-body-s">Page editing is queued for the next content slice.</p>}
-          </Panel>
-        ))}
-      </div>
-      <Panel title="Publication model">
-        <p className="v-body">Working copies are edited privately. Public routes consume published snapshots only, so unfinished content never leaks onto the live site.</p>
-      </Panel>
-    </>
-  );
-}
+export async function loader({context,request}:Route.LoaderArgs){const actor=await requirePermission(context,request,"pages.view");return{items:await listAdminPages(load(context).server,actor)}}
+export async function action({context,request}:Route.ActionArgs){const form=await request.formData(),intent=formString(form,"intent"),server=load(context).server;try{const actor=await requirePermission(context,request,intent==="publish"?"pages.publish":"pages.edit");if(intent==="update"){await updatePage(server,actor,formString(form,"id"),Object.fromEntries(form));return data({ok:true,message:"Page saved."})}if(intent==="publish"){await publishPage(server,actor,formString(form,"id"));return data({ok:true,message:"Page published."})}return data({ok:false,message:"Unknown action.",fields:{}},{status:400})}catch(e){return actionError(e)}}
+export default function Content({loaderData}:Route.ComponentProps){const result=useActionData<typeof action>();const busy=useNavigation().state==="submitting";return <><PageHeading eyebrow="Admin" title="Content" description="Edit working copies and publish immutable public snapshots."/><Panel title="Edit page"><Form method="post" className="v-form v-form--tight"><input type="hidden" name="intent" value="update"/><TextField name="id" label="Page ID" required/><TextField name="key" label="Page key" required/><TextField name="title" label="Title" required/><TextField name="intro" label="Intro"/><TextField name="seoTitle" label="SEO title"/><TextField name="seoDescription" label="SEO description"/><TextField name="body" label="Content blocks JSON" defaultValue="[]"/><Button busy={busy} size="s">Save page</Button></Form></Panel>{result?.ok?<p className="v-notice v-notice--success">{result.message}</p>:null}{result&&!result.ok?<ErrorSummary message={result.message} fields={result.fields}/>:null}<Panel title="Pages" flush><div className="v-tablewrap"><table className="v-table v-table--stack"><caption className="v-sr">Pages</caption><thead><tr><th>Page</th><th>Status</th><th>Updated</th><th>Actions</th></tr></thead><tbody>{loaderData.items.map(p=><tr key={p.id}><td><strong>{p.title}</strong><div className="v-body-s">{p.key}</div></td><td>{p.status}{p.hasUnpublishedChanges?" · draft":""}</td><td className="v-data">{formatDateTime(p.updatedAt)}</td><td><Form method="post"><input type="hidden" name="intent" value="publish"/><input type="hidden" name="id" value={p.id}/><button className="v-btn v-btn--secondary v-btn--s" disabled={!p.hasUnpublishedChanges}>Publish</button></Form></td></tr>)}</tbody></table></div></Panel></>}
