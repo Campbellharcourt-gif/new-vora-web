@@ -1,33 +1,11 @@
-import { load, requirePermission } from "~/.server/guards";
+import { data, Form, useActionData, useNavigation } from "react-router";
+import { actionError, formString, load, requirePermission } from "~/.server/guards";
 import { listSecurityEvents } from "~/.server/services/admin-workspace";
+import { revokeOtherSessions } from "~/.server/services/admin-crud";
 import { formatDateTime, PageHeading, Panel } from "~/components/workspace/WorkspaceShell";
+import { Button, ErrorSummary, TextField } from "~/components/ui/forms";
 import type { Route } from "./+types/security";
 
-export async function loader({ context, request }: Route.LoaderArgs) {
-  return { events: await listSecurityEvents(load(context).server, await requirePermission(context, request, "security.view")) };
-}
-
-export default function Security({ loaderData }: Route.ComponentProps) {
-  return (
-    <>
-      <PageHeading eyebrow="Admin" title="Security" description="Recent security-relevant events from the existing security event pipeline." />
-      <Panel title="Security events" flush>
-        {loaderData.events.length === 0 ? <div className="v-panel__body"><p className="v-body">No security events recorded.</p></div> : (
-          <div className="v-tablewrap"><table className="v-table v-table--stack">
-            <caption className="v-sr">Security events</caption>
-            <thead><tr><th>Time</th><th>Severity</th><th>Event</th><th>User</th><th>Request</th></tr></thead>
-            <tbody>{loaderData.events.map((event) => (
-              <tr key={event.id}>
-                <td className="v-data" data-label="Time">{formatDateTime(event.createdAt)}</td>
-                <td data-label="Severity">{event.severity}</td>
-                <td data-label="Event"><strong>{event.type}</strong></td>
-                <td data-label="User">{event.userId ?? "—"}</td>
-                <td className="v-data" data-label="Request">{event.requestId ?? "—"}</td>
-              </tr>
-            ))}</tbody>
-          </table></div>
-        )}
-      </Panel>
-    </>
-  );
-}
+export async function loader({context,request}:Route.LoaderArgs){const actor=await requirePermission(context,request,"security.view");return{events:await listSecurityEvents(load(context).server,actor)}}
+export async function action({context,request}:Route.ActionArgs){const actor=await requirePermission(context,request,"security.manage");const form=await request.formData();try{const count=await revokeOtherSessions(load(context).server,actor,formString(form,"userId"));return data({ok:true,message:`Revoked ${count} active session(s).`})}catch(e){return actionError(e)}}
+export default function Security({loaderData}:Route.ComponentProps){const result=useActionData<typeof action>();const busy=useNavigation().state==="submitting";return <><PageHeading eyebrow="Admin" title="Security" description="Review security events and perform controlled session actions."/><Panel title="Revoke another user's sessions"><Form method="post" className="v-form v-form--tight"><TextField name="userId" label="User ID" required/><Button busy={busy} size="s">Revoke sessions</Button></Form></Panel>{result?.ok?<p className="v-notice v-notice--success">{result.message}</p>:null}{result&&!result.ok?<ErrorSummary message={result.message} fields={result.fields}/>:null}<Panel title="Security events" flush>{loaderData.events.length===0?<div className="v-panel__body"><p className="v-body">No security events recorded.</p></div>:<div className="v-tablewrap"><table className="v-table v-table--stack"><caption className="v-sr">Security events</caption><thead><tr><th>Time</th><th>Severity</th><th>Event</th><th>User</th><th>Request</th></tr></thead><tbody>{loaderData.events.map(event=><tr key={event.id}><td className="v-data">{formatDateTime(event.createdAt)}</td><td>{event.severity}</td><td><strong>{event.type}</strong></td><td>{event.userId??"—"}</td><td className="v-data">{event.requestId??"—"}</td></tr>)}</tbody></table></div>}</Panel></>}
