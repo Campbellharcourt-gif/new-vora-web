@@ -1,4 +1,4 @@
-import { count, desc, eq, isNull } from "drizzle-orm";
+import { count, desc, eq, inArray, isNull } from "drizzle-orm";
 import { authorize } from "../auth/rbac";
 import type { Actor } from "../auth/types";
 import type { ServerContext } from "../context";
@@ -22,7 +22,7 @@ export async function adminOverview(ctx: ServerContext, actorInput: Actor | null
         ? ctx.db.select({ n: count() }).from(schema.clientOrgs).where(eq(schema.clientOrgs.status, "active")).get()
         : null,
       actor.permissions.has("engagements.view")
-        ? ctx.db.select({ n: count() }).from(schema.engagements).where(eq(schema.engagements.status, "active")).get()
+        ? ctx.db.select({ n: count() }).from(schema.engagements).where(inArray(schema.engagements.status, ["planning", "in_progress", "review"])).get()
         : null,
       actor.permissions.has("enquiries.view")
         ? ctx.db.select({ n: count() }).from(schema.enquiries).where(isNull(schema.enquiries.deletedAt)).get()
@@ -142,7 +142,7 @@ export async function settingsOverview(ctx: ServerContext, actorInput: Actor | n
   const actor = await authorize(ctx, actorInput, "settings.view");
   const entries = [];
   for (const key of Object.keys(SETTINGS) as (keyof typeof SETTINGS)[]) {
-    entries.push({ key, value: await getSetting(ctx, key), canManage: actor.permissions.has(SETTINGS[key] ? "settings.manage" : "settings.view") });
+    entries.push({ key, value: await getSetting(ctx, key), canManage: actor.permissions.has("settings.manage") });
   }
   return entries;
 }
