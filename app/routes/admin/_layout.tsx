@@ -12,6 +12,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
       { to: "/admin", label: "Dashboard", end: true },
       ...(has("enquiries.view") ? [{ to: "/admin/enquiries", label: "Enquiries" }] : []),
       ...(has("clients.view") ? [{ to: "/admin/clients", label: "Clients" }] : []),
+      ...(has("engagements.view") ? [{ to: "/admin/engagements", label: "Engagements" }] : []),
       ...(has("projects.view") ? [{ to: "/admin/projects", label: "Projects" }] : []),
       ...(has("services.view") ? [{ to: "/admin/services", label: "Services" }] : []),
       ...(has("pages.view") ? [{ to: "/admin/content", label: "Content" }] : []),
