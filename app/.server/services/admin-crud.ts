@@ -61,7 +61,7 @@ export async function createProject(ctx: ServerContext, actorInput: Actor | null
   try {
     await ctx.db.insert(schema.projects).values({
       id, slug:v.slug, title:v.title, category:v.category ?? null, summary:v.summary ?? null, year:v.year ?? null,
-      clientName:v.clientName ?? null, externalUrl:v.externalUrl ?? null, body:v.body, credits:[], status:"draft",
+      clientName:v.clientName ?? null, externalUrl:v.externalUrl ?? null, body:v.body as never, credits:[], status:"draft",
       isFeatured:false, sortOrder:0, hasUnpublishedChanges:true, createdBy:actor.userId, updatedBy:actor.userId, createdAt:now, updatedAt:now,
     });
   } catch { throw errors.validation({ slug: "That project slug is already in use." }); }
@@ -99,19 +99,19 @@ export async function archiveProject(ctx:ServerContext,actorInput:Actor|null,id:
 
 export async function createService(ctx:ServerContext,actorInput:Actor|null,input:Record<string,unknown>){
   const actor=await authorize(ctx,actorInput,"services.edit");
-  const v=z.object({slug,title:text(120),summary:z.string().trim().max(500).nullable().optional(),deliveryModel:z.enum(["vora","partner","joint"]),body:z.preprocess(parseBody,contentBody).default([])}).safeParse(input);
+  const v=z.object({slug,title:text(120),summary:z.string().trim().max(500).nullable().optional(),deliveryModel:z.enum(["vora","partner","joint"]),partnerId:z.string().nullable().optional(),body:z.preprocess(parseBody,contentBody).default([])}).safeParse(input);
   if(!v.success) throw errors.validation({form:v.error.issues[0]?.message??"Invalid service."});
   const now=ctx.clock.now(),id=newId("service",now),d=v.data;
-  try{await ctx.db.insert(schema.services).values({id,slug:d.slug,name:d.title,summary:d.summary??null,deliveryModel:d.deliveryModel,body:d.body,status:"draft",sortOrder:0,hasUnpublishedChanges:true,createdBy:actor.userId,updatedBy:actor.userId,createdAt:now,updatedAt:now});}
+  try{await ctx.db.insert(schema.services).values({id,slug:d.slug,name:d.title,summary:d.summary??null,deliveryModel:d.deliveryModel,partnerId:d.partnerId??null,body:d.body as never,status:"draft",sortOrder:0,hasUnpublishedChanges:true,createdBy:actor.userId,updatedBy:actor.userId,createdAt:now,updatedAt:now});}
   catch{throw errors.validation({slug:"That service slug is already in use."});}
   await writeAudit(ctx,actor,{action:"services.create",targetType:"service",targetId:id,summary:`Created service ${d.title}`}); return id;
 }
 
 export async function updateService(ctx:ServerContext,actorInput:Actor|null,id:string,input:Record<string,unknown>){
   const actor=await authorize(ctx,actorInput,"services.edit"); const current=await ctx.db.select().from(schema.services).where(eq(schema.services.id,id)).get(); if(!current||current.archivedAt)throw errors.notFound();
-  const v=z.object({slug,title:text(120),summary:z.string().trim().max(500).nullable().optional(),deliveryModel:z.enum(["vora","partner","joint"]),body:z.preprocess(parseBody,contentBody).default([])}).safeParse(input);
+  const v=z.object({slug,title:text(120),summary:z.string().trim().max(500).nullable().optional(),deliveryModel:z.enum(["vora","partner","joint"]),partnerId:z.string().nullable().optional(),body:z.preprocess(parseBody,contentBody).default([])}).safeParse(input);
   if(!v.success)throw errors.validation({form:v.error.issues[0]?.message??"Invalid service."}); const d=v.data,now=ctx.clock.now();
-  await ctx.db.update(schema.services).set({slug:d.slug,name:d.title,summary:d.summary??null,deliveryModel:d.deliveryModel,body:d.body,hasUnpublishedChanges:true,updatedBy:actor.userId,updatedAt:now}).where(eq(schema.services.id,id)).run();
+  await ctx.db.update(schema.services).set({slug:d.slug,name:d.title,summary:d.summary??null,deliveryModel:d.deliveryModel,partnerId:d.partnerId??null,body:d.body as never,hasUnpublishedChanges:true,updatedBy:actor.userId,updatedAt:now}).where(eq(schema.services.id,id)).run();
   await writeAudit(ctx,actor,{action:"services.update",targetType:"service",targetId:id,summary:`Updated service ${d.title}`});
 }
 
