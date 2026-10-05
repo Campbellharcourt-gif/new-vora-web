@@ -4,11 +4,13 @@ import type { WorkerEnv } from "~/.server/config/env";
 import { AppError } from "~/.server/lib/errors";
 import {
   addEnquiryNote,
+  assignEnquiry,
   changeEnquiryStatus,
   getEnquiry,
   listEnquiries,
 } from "~/.server/services/enquiries";
 import { issueFormToken } from "~/.server/services/form-token";
+import { listNotifications } from "~/.server/services/notifications";
 import {
   actorFor,
   call,
@@ -394,5 +396,59 @@ describe("enquiry administration", () => {
     expect(page2.items[0]?.id).not.toBe(page1.items[0]?.id);
     const received = await listEnquiries(makeCtx(), manager, { status: "received", limit: 100 });
     expect(received.items.every((i) => i.status === "received")).toBe(true);
+  });
+
+  it("searches by name, email, company and reference, and filters by assignee", async () => {
+    const res = await submit({
+      fields: fields({ name: "Quinn Searchable", company: "Zephyr Labs" }),
+      formToken: await formToken(),
+    });
+    const { reference } = (await res.json()) as { reference: string };
+    const manager = await actorFor((await createUser({ roles: ["manager"] })).id);
+    for (const q of ["searchable", "ZEPHYR", reference.toLowerCase()]) {
+      const found = await listEnquiries(makeCtx(), manager, { q, limit: 100 });
+      expect(
+        found.items.map((i) => i.reference),
+        q,
+      ).toEqual([reference]);
+    }
+    // LIKE wildcards in the query are literal.
+    expect((await listEnquiries(makeCtx(), manager, { q: "%", limit: 100 })).items).toEqual([]);
+  });
+
+  it("assigns enquiries to team members, records it, and notifies the assignee", async () => {
+    const enquiry = await newEnquiry();
+    const manager = await actorFor((await createUser({ roles: ["manager"] })).id);
+    const staffUser = await createUser({ roles: ["staff"], name: "Robin Staff" });
+    const staff = await actorFor(staffUser.id);
+    await assignEnquiry(makeCtx(), manager, enquiry.id, staffUser.id);
+    const detail = await getEnquiry(makeCtx(), manager, enquiry.id);
+    expect(detail.assignee?.name).toBe("Robin Staff");
+    expect(detail.events[0]).toMatchObject({ type: "assignment", body: "Assigned to Robin Staff" });
+    const mine = await listEnquiries(makeCtx(), staff, { assigned: "me", limit: 100 });
+    expect(mine.items.map((i) => i.id)).toEqual([enquiry.id]);
+    const notes = await listNotifications(makeCtx(), staff);
+    expect(notes[0]).toMatchObject({
+      type: "enquiry.assigned",
+      link: `/admin/enquiries/${enquiry.id}`,
+    });
+    const audit = await db
+      .select()
+      .from(schema.auditLogs)
+      .where(eq(schema.auditLogs.action, "enquiry.assign"))
+      .all();
+    expect(audit.some((a) => a.targetId === enquiry.id)).toBe(true);
+
+    // Only people who can see enquiries can be assigned; clients can't assign at all.
+    const client = await createUser({ roles: ["client"] });
+    expect((await appError(assignEnquiry(makeCtx(), manager, enquiry.id, client.id))).code).toBe(
+      "validation_failed",
+    );
+    const clientActor = await actorFor(client.id);
+    expect((await appError(assignEnquiry(makeCtx(), clientActor, enquiry.id, null))).code).toBe(
+      "forbidden",
+    );
+    await assignEnquiry(makeCtx(), manager, enquiry.id, null);
+    expect((await getEnquiry(makeCtx(), manager, enquiry.id)).assignee).toBeNull();
   });
 });

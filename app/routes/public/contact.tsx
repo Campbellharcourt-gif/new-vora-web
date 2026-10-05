@@ -15,9 +15,13 @@ import {
   TextArea,
   TextField,
 } from "~/components/ui/forms";
-import { Label, Lines, Slot, SurveyLine } from "~/components/vora/primitives";
+import { Label, Lines, SurveyLine } from "~/components/vora/primitives";
 import type { loader as rootLoader } from "~/root";
 import type { Route } from "./+types/contact";
+
+/** The promise after sending: what happens, never when (no response times are promised). */
+const AFTER_SENDING =
+  "Your enquiry is securely received by our team, reviewed with care, and followed up with the next steps when there’s something to discuss.";
 
 export async function loader({ context }: Route.LoaderArgs) {
   const { server } = load(context);
@@ -124,12 +128,12 @@ export default function Contact({ loaderData }: Route.ComponentProps) {
 
   const context = (
     <aside className="v-contact__context" aria-label="About your enquiry">
-      <div className="v-stack" style={{ gap: "var(--space-3)" }}>
-        <Label>What happens next</Label>
-        <p className="v-body-s">
-          <Slot>What happens after sending — copy slot (no invented response times)</Slot>
-        </p>
-      </div>
+      {result?.ok ? null : (
+        <div className="v-stack" style={{ gap: "var(--space-3)" }}>
+          <Label>What happens after sending</Label>
+          <p className="v-body-s">{AFTER_SENDING}</p>
+        </div>
+      )}
       {assistant.available ? (
         <div className="v-stack" style={{ gap: "var(--space-2)" }}>
           <Label>A question first</Label>
@@ -175,9 +179,10 @@ export default function Contact({ loaderData }: Route.ComponentProps) {
           <h1 id="thanks" className="v-display-m" tabIndex={-1}>
             Thank you.
           </h1>
-          <p className="v-body">
-            Your enquiry has been received and will be reviewed by the VORA team.
-          </p>
+          <div className="v-stack" style={{ gap: "var(--space-2)" }}>
+            <Label>What happens after sending</Label>
+            <p className="v-body">{AFTER_SENDING}</p>
+          </div>
           {result.reference ? (
             <p className="v-body-s">
               Your reference is <strong className="v-data">{result.reference}</strong>. A
@@ -346,7 +351,7 @@ export default function Contact({ loaderData }: Route.ComponentProps) {
                     <>
                       I've read the{" "}
                       <a className="v-link" href="/privacy">
-                        privacy notice
+                        Privacy Policy
                       </a>{" "}
                       and agree to VORA using these details to respond to my enquiry.
                     </>

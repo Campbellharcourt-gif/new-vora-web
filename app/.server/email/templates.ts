@@ -276,7 +276,7 @@ export const templates = {
   ): RenderedEmail {
     const body = [
       `Hi ${d.name},`,
-      "Thank you for getting in touch with VORA. Your enquiry has been received and will be reviewed by the team.",
+      "Thank you for getting in touch with VORA. Your enquiry is securely received by our team, reviewed with care, and followed up with the next steps when there’s something to discuss.",
       `Your reference is ${d.reference}. If you need to add anything, reply to this email or write to ${d.replyEmail} and include the reference.`,
     ];
     const { html, text } = layout({

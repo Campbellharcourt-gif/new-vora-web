@@ -452,7 +452,7 @@ test("hostile enquiry content is shown as text in the admin, never executed", as
   await form.getByRole("checkbox", { name: "Website or digital platform" }).check();
   await form.getByRole("radio", { name: "Flexible" }).check();
   await form.getByLabel("About the project").fill(payloadMessage);
-  await form.getByRole("checkbox", { name: /privacy notice/ }).check();
+  await form.getByRole("checkbox", { name: /Privacy Policy/ }).check();
   await form.waitForTimeout(3500);
   await form.getByRole("button", { name: "Send enquiry" }).click();
   await expect(form.getByRole("heading", { level: 1 })).toHaveText("Thank you.");

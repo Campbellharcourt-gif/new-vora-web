@@ -1,6 +1,18 @@
 import { expect, test } from "@playwright/test";
 
+const AFTER_SENDING =
+  "Your enquiry is securely received by our team, reviewed with care, and followed up with the next steps when there’s something to discuss.";
+
 test.describe("enquiry form (real UI → D1 → outbox)", () => {
+  test("explains what happens after sending, and links the Privacy Policy", async ({ page }) => {
+    await page.goto("/contact");
+    await expect(page.getByText("What happens after sending")).toBeVisible();
+    await expect(page.getByText(AFTER_SENDING, { exact: true })).toBeVisible();
+    await expect(
+      page.locator("main").getByRole("link", { name: "Privacy Policy" }),
+    ).toHaveAttribute("href", "/privacy");
+  });
+
   test("shows field errors for an empty submission", async ({ page }) => {
     await page.goto("/contact");
     await page.waitForTimeout(3500); // the signed form token rejects bot-speed submissions
@@ -8,12 +20,12 @@ test.describe("enquiry form (real UI → D1 → outbox)", () => {
     // Error summary (announced) plus inline errors wired to their fields for assistive tech.
     const summary = page.getByRole("alert").first();
     await expect(summary).toBeVisible();
-    await expect(summary).toContainText("Please confirm you have read the privacy notice.");
-    const consent = page.getByRole("checkbox", { name: /privacy notice/ });
+    await expect(summary).toContainText("Please confirm you have read the Privacy Policy.");
+    const consent = page.getByRole("checkbox", { name: /Privacy Policy/ });
     await expect(consent).toHaveAttribute("aria-invalid", "true");
     const describedBy = (await consent.getAttribute("aria-describedby")) ?? "";
     await expect(page.locator(`[id="${describedBy}"]`)).toHaveText(
-      "Please confirm you have read the privacy notice.",
+      "Please confirm you have read the Privacy Policy.",
     );
     await expect(page.getByLabel("Your name")).toHaveAttribute("aria-invalid", "true");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Start a project");
@@ -31,11 +43,14 @@ test.describe("enquiry form (real UI → D1 → outbox)", () => {
     await page
       .getByLabel("About the project")
       .fill("We are planning a new website for our studio and want to talk about scope.");
-    await page.getByRole("checkbox", { name: /privacy notice/ }).check();
+    await page.getByRole("checkbox", { name: /Privacy Policy/ }).check();
     await page.waitForTimeout(3500);
     await page.getByRole("button", { name: "Send enquiry" }).click();
 
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Thank you.");
+    // What happens after sending — exactly this, and no promised response time.
+    await expect(page.getByText(AFTER_SENDING, { exact: true })).toBeVisible();
+    await expect(page.locator("main")).not.toContainText(/within \d|hours?|business days?/i);
     const reference = await page.locator("strong").filter({ hasText: /^VR-/ }).textContent();
     expect(reference).toMatch(/^VR-[0-9A-HJKMNP-TV-Z]{6}$/);
 

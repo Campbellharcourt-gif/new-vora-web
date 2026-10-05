@@ -37,7 +37,7 @@ export const enquiryFieldsSchema = z.object({
   message: text(ENQUIRY_LIMITS.messageMin, ENQUIRY_LIMITS.message),
   source: optionalText(64),
   sourceDetail: optionalText(ENQUIRY_LIMITS.sourceDetail),
-  consent: z.literal(true, { error: "Please confirm you have read the privacy notice." }),
+  consent: z.literal(true, { error: "Please confirm you have read the Privacy Policy." }),
 });
 
 export type EnquiryFields = z.infer<typeof enquiryFieldsSchema>;

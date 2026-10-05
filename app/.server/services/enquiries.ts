@@ -1,7 +1,7 @@
 import { ENQUIRY_PROJECT_TYPES, ENQUIRY_TRANSITIONS, type EnquiryStatus } from "@shared/enums";
 import { fieldErrors } from "@shared/validation/common";
 import { createEnquirySchema, type EnquiryFields } from "@shared/validation/enquiry";
-import { and, count, desc, eq, gt, isNull, lt } from "drizzle-orm";
+import { and, count, desc, eq, gt, inArray, isNull, lt, or, type SQL, sql } from "drizzle-orm";
 import { authorize } from "../auth/rbac";
 import type { Actor } from "../auth/types";
 import type { ServerContext } from "../context";
@@ -14,6 +14,7 @@ import { HOUR } from "../lib/time";
 import { hashIp, writeAudit } from "../observability/audit";
 import { recordSecurityEvent } from "../observability/security-events";
 import { issueFormToken, verifyFormToken } from "./form-token";
+import { activeUsersWithPermission, notify } from "./notifications";
 import { checkRateLimit } from "./rate-limit";
 import { getSetting } from "./settings";
 import { verifyTurnstile } from "./turnstile";
@@ -244,16 +245,43 @@ export async function submitEnquiry(
 // Admin operations
 // ---------------------------------------------------------------------------------------------
 
+export interface EnquiryFilter {
+  status?: EnquiryStatus;
+  /** Name, email, company, reference or message text. */
+  q?: string;
+  /** "me", "unassigned", or a user id. */
+  assigned?: string;
+  before?: number;
+  limit?: number;
+}
+
 export async function listEnquiries(
   ctx: ServerContext,
   actorInput: Actor | null,
-  filter: { status?: EnquiryStatus; before?: number; limit?: number } = {},
+  filter: EnquiryFilter = {},
 ) {
-  await authorize(ctx, actorInput, "enquiries.view");
+  const actor = await authorize(ctx, actorInput, "enquiries.view");
   const limit = Math.min(Math.max(filter.limit ?? 50, 1), 100);
-  const conditions = [isNull(schema.enquiries.deletedAt)];
+  const conditions: SQL[] = [isNull(schema.enquiries.deletedAt)];
   if (filter.status) conditions.push(eq(schema.enquiries.status, filter.status));
   if (filter.before) conditions.push(lt(schema.enquiries.createdAt, filter.before));
+  if (filter.assigned === "me") conditions.push(eq(schema.enquiries.assignedTo, actor.userId));
+  else if (filter.assigned === "unassigned") conditions.push(isNull(schema.enquiries.assignedTo));
+  else if (filter.assigned && isId(filter.assigned, "user")) {
+    conditions.push(eq(schema.enquiries.assignedTo, filter.assigned));
+  }
+  const q = filter.q?.trim().slice(0, 100);
+  if (q) {
+    const pattern = `%${q.toLowerCase().replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
+    const match = or(
+      sql`lower(${schema.enquiries.name}) like ${pattern} escape '\\'`,
+      sql`${schema.enquiries.email} like ${pattern} escape '\\'`,
+      sql`lower(coalesce(${schema.enquiries.company}, '')) like ${pattern} escape '\\'`,
+      sql`lower(${schema.enquiries.reference}) like ${pattern} escape '\\'`,
+      sql`lower(${schema.enquiries.message}) like ${pattern} escape '\\'`,
+    );
+    if (match) conditions.push(match);
+  }
   const rows = await ctx.db
     .select({
       id: schema.enquiries.id,
@@ -264,9 +292,12 @@ export async function listEnquiries(
       projectTypes: schema.enquiries.projectTypes,
       status: schema.enquiries.status,
       spamScore: schema.enquiries.spamScore,
+      assignedTo: schema.enquiries.assignedTo,
+      assigneeName: schema.users.name,
       createdAt: schema.enquiries.createdAt,
     })
     .from(schema.enquiries)
+    .leftJoin(schema.users, eq(schema.users.id, schema.enquiries.assignedTo))
     .where(and(...conditions))
     .orderBy(desc(schema.enquiries.createdAt))
     .limit(limit + 1)
@@ -274,6 +305,73 @@ export async function listEnquiries(
   const hasMore = rows.length > limit;
   const items = rows.slice(0, limit);
   return { items, nextBefore: hasMore ? (items.at(-1)?.createdAt ?? null) : null };
+}
+
+/** Team members an enquiry can be assigned to (active, with enquiries.view). */
+export async function enquiryAssignees(ctx: ServerContext) {
+  const ids = await activeUsersWithPermission(ctx, "enquiries.view");
+  if (ids.length === 0) return [];
+  return ctx.db
+    .select({ id: schema.users.id, name: schema.users.name })
+    .from(schema.users)
+    .where(inArray(schema.users.id, ids))
+    .orderBy(schema.users.name)
+    .all();
+}
+
+/** Assigns (or unassigns, with null) an enquiry. The new assignee is notified in the app. */
+export async function assignEnquiry(
+  ctx: ServerContext,
+  actorInput: Actor | null,
+  id: string,
+  userId: string | null,
+): Promise<void> {
+  const actor = await authorize(ctx, actorInput, "enquiries.edit");
+  const { enquiry } = await getEnquiry(ctx, actor, id);
+  let assignee: { id: string; name: string } | null = null;
+  if (userId) {
+    const allowed = await activeUsersWithPermission(ctx, "enquiries.view");
+    if (!isId(userId, "user") || !allowed.includes(userId)) {
+      throw errors.validation({ assignee: "Choose someone on the team who can see enquiries." });
+    }
+    assignee =
+      (await ctx.db
+        .select({ id: schema.users.id, name: schema.users.name })
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .get()) ?? null;
+  }
+  if ((enquiry.assignedTo ?? null) === (assignee?.id ?? null)) return;
+  const now = ctx.clock.now();
+  await ctx.db
+    .update(schema.enquiries)
+    .set({ assignedTo: assignee?.id ?? null, updatedAt: now })
+    .where(eq(schema.enquiries.id, id));
+  await ctx.db.insert(schema.enquiryEvents).values({
+    id: newId("enquiryEvent", now),
+    enquiryId: id,
+    type: "assignment",
+    body: assignee ? `Assigned to ${assignee.name}` : "Unassigned",
+    actorUserId: actor.userId,
+    createdAt: now,
+  });
+  await writeAudit(ctx, actor, {
+    action: "enquiry.assign",
+    targetType: "enquiry",
+    targetId: id,
+    summary: assignee
+      ? `Enquiry ${enquiry.reference} assigned to ${assignee.name}`
+      : `Enquiry ${enquiry.reference} unassigned`,
+    changes: { assignedTo: { from: enquiry.assignedTo, to: assignee?.id ?? null } },
+  });
+  if (assignee && assignee.id !== actor.userId) {
+    await notify(ctx, assignee.id, {
+      type: "enquiry.assigned",
+      title: `Enquiry ${enquiry.reference} was assigned to you`,
+      body: `From ${enquiry.name}${enquiry.company ? `, ${enquiry.company}` : ""}.`,
+      link: `/admin/enquiries/${id}`,
+    });
+  }
 }
 
 export async function getEnquiry(ctx: ServerContext, actorInput: Actor | null, id: string) {
@@ -286,12 +384,28 @@ export async function getEnquiry(ctx: ServerContext, actorInput: Actor | null, i
     .get();
   if (!enquiry) throw errors.notFound();
   const events = await ctx.db
-    .select()
+    .select({
+      id: schema.enquiryEvents.id,
+      type: schema.enquiryEvents.type,
+      fromStatus: schema.enquiryEvents.fromStatus,
+      toStatus: schema.enquiryEvents.toStatus,
+      body: schema.enquiryEvents.body,
+      createdAt: schema.enquiryEvents.createdAt,
+      actorName: schema.users.name,
+    })
     .from(schema.enquiryEvents)
+    .leftJoin(schema.users, eq(schema.users.id, schema.enquiryEvents.actorUserId))
     .where(eq(schema.enquiryEvents.enquiryId, id))
     .orderBy(desc(schema.enquiryEvents.createdAt))
     .all();
-  return { enquiry, events };
+  const assignee = enquiry.assignedTo
+    ? ((await ctx.db
+        .select({ id: schema.users.id, name: schema.users.name })
+        .from(schema.users)
+        .where(eq(schema.users.id, enquiry.assignedTo))
+        .get()) ?? null)
+    : null;
+  return { enquiry, events, assignee };
 }
 
 export async function changeEnquiryStatus(

@@ -6,24 +6,34 @@ import {
 } from "@shared/enums";
 import { data, Form, useActionData, useNavigation } from "react-router";
 import { failureFrom, formString, load, requirePermission } from "~/.server/guards";
-import { addEnquiryNote, changeEnquiryStatus, getEnquiry } from "~/.server/services/enquiries";
-import { Button, ErrorSummary, Notice, TextArea } from "~/components/ui/forms";
+import {
+  addEnquiryNote,
+  assignEnquiry,
+  changeEnquiryStatus,
+  enquiryAssignees,
+  getEnquiry,
+} from "~/.server/services/enquiries";
+import { Button, ErrorSummary, Notice, Select, TextArea } from "~/components/ui/forms";
 import { EnquiryStatusTag } from "~/components/workspace/status";
 import { formatDateTime, PageHeading, Panel } from "~/components/workspace/WorkspaceShell";
 import type { Route } from "./+types/enquiry";
 
 export async function loader({ context, request, params }: Route.LoaderArgs) {
   const actor = await requirePermission(context, request, "enquiries.view");
-  const { enquiry, events } = await getEnquiry(load(context).server, actor, params.id).catch(
+  const { server } = load(context);
+  const { enquiry, events, assignee } = await getEnquiry(server, actor, params.id).catch(
     (error) => {
       failureFrom(error);
       throw error;
     },
   );
+  const canEdit = actor.permissions.has("enquiries.edit");
   return {
     enquiry,
     events,
-    canEdit: actor.permissions.has("enquiries.edit"),
+    assignee,
+    assignees: canEdit ? await enquiryAssignees(server) : [],
+    canEdit,
     transitions: ENQUIRY_TRANSITIONS[enquiry.status],
   };
 }
@@ -36,6 +46,11 @@ export async function action({ context, request, params }: Route.ActionArgs) {
     if (formString(form, "intent") === "note") {
       await addEnquiryNote(server, actor, params.id, formString(form, "note"));
       return { ok: true as const, message: "Note added." };
+    }
+    if (formString(form, "intent") === "assign") {
+      const assignee = formString(form, "assignee") || null;
+      await assignEnquiry(server, actor, params.id, assignee);
+      return { ok: true as const, message: assignee ? "Assigned." : "Unassigned." };
     }
     const to = formString(form, "status") as EnquiryStatus;
     if (!ENQUIRY_STATUSES.includes(to))
@@ -101,6 +116,28 @@ export default function EnquiryDetail({ loaderData }: Route.ComponentProps) {
         </Panel>
 
         <div className="v-panels__aside">
+          <Panel title="Assigned to">
+            {loaderData.canEdit ? (
+              <Form method="post" className="v-form v-form--tight">
+                <input type="hidden" name="intent" value="assign" />
+                <Select
+                  name="assignee"
+                  label="Team member"
+                  options={loaderData.assignees.map((a) => ({ key: a.id, label: a.name }))}
+                  defaultValue={loaderData.assignee?.id ?? ""}
+                  placeholder="Unassigned"
+                />
+                <div>
+                  <Button variant="secondary" size="s" busy={busy}>
+                    Save assignment
+                  </Button>
+                </div>
+              </Form>
+            ) : (
+              <p className="v-body">{loaderData.assignee?.name ?? "Unassigned"}</p>
+            )}
+          </Panel>
+
           {loaderData.canEdit ? (
             <Panel title="Update">
               {loaderData.transitions.length > 0 ? (
@@ -167,7 +204,10 @@ export default function EnquiryDetail({ loaderData }: Route.ComponentProps) {
                         ? "Enquiry received"
                         : ev.type === "note"
                           ? "Note"
-                          : ev.type}
+                          : ev.type === "assignment"
+                            ? "Assignment"
+                            : ev.type}
+                    {ev.actorName ? <span className="v-secondary"> · {ev.actorName}</span> : null}
                   </span>
                   {ev.body ? <p className="v-message v-body-s">{ev.body}</p> : null}
                 </li>

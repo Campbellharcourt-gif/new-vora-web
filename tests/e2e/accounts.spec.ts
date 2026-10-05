@@ -34,10 +34,9 @@ test.describe("create an account (Client or Member)", () => {
     await expect(page.getByRole("radio", { name: "Member" })).toHaveAccessibleDescription(
       "For VORA members who need access to member resources and their account.",
     );
-    await expect(page.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute(
-      "href",
-      "/privacy",
-    );
+    await expect(
+      page.locator("main").getByRole("link", { name: "Privacy Policy" }),
+    ).toHaveAttribute("href", "/privacy");
   });
 
   test("a client registers, confirms by email, sets a password and lands in the portal", async ({
