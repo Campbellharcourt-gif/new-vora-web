@@ -8,6 +8,7 @@ import {
   contentPublicPath,
 } from "@shared/content/kinds";
 import { data, Form, Link, useActionData, useNavigation, useSearchParams } from "react-router";
+import { adminAiAvailable, suggestContentEdit } from "~/.server/ai/admin-tools";
 import { actionError, failureFrom, formString, load, requirePermission } from "~/.server/guards";
 import {
   contentPermissions,
@@ -79,6 +80,7 @@ export async function loader({ context, request, params }: Route.LoaderArgs) {
     versions: item.versions,
     can: item.can,
     publicPath: live ? contentPublicPath(kind, key) : null,
+    aiAvailable: item.can.edit && (await adminAiAvailable(server, actor)),
     partners:
       kind === "service"
         ? (await partnerOptions(server)).map((p) => ({ key: p.id, label: p.name }))
@@ -122,6 +124,16 @@ export async function action({ context, request, params }: Route.ActionArgs) {
           ok: true as const,
           message: intent === "archive" ? "Archived." : "Restored from the archive as a draft.",
         };
+      case "ai-suggest": {
+        const suggestion = await suggestContentEdit(
+          server,
+          actor,
+          kind,
+          params.id,
+          formString(form, "instruction"),
+        );
+        return { ok: true as const, message: "", suggestion };
+      }
       case "restore": {
         const { version } = await restoreVersion(
           server,
@@ -204,7 +216,7 @@ export default function ContentItem({ loaderData }: Route.ComponentProps) {
           Draft created. Add the details, save, then publish when it's ready.
         </Notice>
       ) : null}
-      {result?.ok ? (
+      {result?.ok && !("suggestion" in result) ? (
         <Notice tone="success" label="Done">
           {result.message}
         </Notice>
@@ -302,6 +314,42 @@ export default function ContentItem({ loaderData }: Route.ComponentProps) {
                   ) : null}
                 </>
               )}
+            </Panel>
+          ) : null}
+
+          {d.aiAvailable && editable ? (
+            <Panel title="VORA AI">
+              {result?.ok && "suggestion" in result ? (
+                <div className="v-stack" style={{ gap: "var(--space-2)" }}>
+                  <label className="v-field__label" htmlFor="ai-suggestion">
+                    Suggestion (not saved — copy what you want into the draft)
+                  </label>
+                  <textarea
+                    id="ai-suggestion"
+                    className="v-textarea"
+                    rows={10}
+                    readOnly
+                    value={result.suggestion}
+                  />
+                </div>
+              ) : null}
+              <Form method="post" className="v-form v-form--tight">
+                <input type="hidden" name="intent" value="ai-suggest" />
+                <TextArea
+                  name="instruction"
+                  label="What should VORA AI help with?"
+                  rows={2}
+                  maxLength={500}
+                  required
+                  hint="For example: tighten the summary, or suggest clearer headings. It works from the saved draft."
+                  error={fields.instruction}
+                />
+                <div>
+                  <Button variant="secondary" size="s" busy={busyIntent === "ai-suggest"}>
+                    Suggest
+                  </Button>
+                </div>
+              </Form>
             </Panel>
           ) : null}
 

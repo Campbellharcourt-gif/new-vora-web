@@ -66,6 +66,7 @@ export default [
     route("users/:id", "routes/admin/user.tsx"),
     route("roles", "routes/admin/roles.tsx"),
     route("privacy", "routes/admin/privacy.tsx"),
+    route("ai", "routes/admin/ai.tsx"),
     route("system", "routes/admin/system.tsx"),
   ]),
   route("client", "routes/client/_layout.tsx", [

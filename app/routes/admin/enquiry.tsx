@@ -5,6 +5,7 @@ import {
   type EnquiryStatus,
 } from "@shared/enums";
 import { data, Form, useActionData, useNavigation } from "react-router";
+import { adminAiAvailable, summariseEnquiry } from "~/.server/ai/admin-tools";
 import { failureFrom, formString, load, requirePermission } from "~/.server/guards";
 import {
   addEnquiryNote,
@@ -33,15 +34,29 @@ export async function loader({ context, request, params }: Route.LoaderArgs) {
     events,
     assignee,
     assignees: canEdit ? await enquiryAssignees(server) : [],
+    aiAvailable: await adminAiAvailable(server, actor),
     canEdit,
     transitions: ENQUIRY_TRANSITIONS[enquiry.status],
   };
 }
 
 export async function action({ context, request, params }: Route.ActionArgs) {
-  const actor = await requirePermission(context, request, "enquiries.edit");
   const { server } = load(context);
   const form = await request.formData();
+  if (formString(form, "intent") === "ai-summary") {
+    const viewer = await requirePermission(context, request, "ai.use");
+    try {
+      const summary = await summariseEnquiry(server, viewer, params.id);
+      return { ok: true as const, message: "", aiSummary: summary };
+    } catch (error) {
+      const failure = failureFrom(error);
+      return data(
+        { ok: false as const, message: failure.message, fields: failure.fields, ai: true },
+        { status: failure.status },
+      );
+    }
+  }
+  const actor = await requirePermission(context, request, "enquiries.edit");
   try {
     if (formString(form, "intent") === "note") {
       await addEnquiryNote(server, actor, params.id, formString(form, "note"));
@@ -90,12 +105,12 @@ export default function EnquiryDetail({ loaderData }: Route.ComponentProps) {
         actions={<EnquiryStatusTag status={e.status} />}
       />
       <p className="v-body-s">Received {formatDateTime(e.createdAt)}</p>
-      {result?.ok ? (
+      {result?.ok && !("aiSummary" in result) ? (
         <Notice tone="success" label="Saved">
           {result.message}
         </Notice>
       ) : null}
-      {result && !result.ok ? <ErrorSummary message={result.message} /> : null}
+      {result && !result.ok && !("ai" in result) ? <ErrorSummary message={result.message} /> : null}
 
       <div className="v-panels v-panels--detail">
         <Panel title="Details">
@@ -116,6 +131,30 @@ export default function EnquiryDetail({ loaderData }: Route.ComponentProps) {
         </Panel>
 
         <div className="v-panels__aside">
+          {loaderData.aiAvailable ? (
+            <Panel title="VORA AI">
+              {result && "aiSummary" in result && result.aiSummary ? (
+                <div className="v-stack" style={{ gap: "var(--space-2)" }}>
+                  <p className="v-message v-body-s">{result.aiSummary}</p>
+                  <p className="v-body-s v-secondary">
+                    AI-written summary — check it against the enquiry.
+                  </p>
+                </div>
+              ) : null}
+              {result && !result.ok && "ai" in result ? (
+                <Notice tone="warning" label="VORA AI">
+                  {result.message}
+                </Notice>
+              ) : null}
+              <Form method="post">
+                <input type="hidden" name="intent" value="ai-summary" />
+                <Button variant="secondary" size="s" busy={busy}>
+                  Summarise this enquiry
+                </Button>
+              </Form>
+            </Panel>
+          ) : null}
+
           <Panel title="Assigned to">
             {loaderData.canEdit ? (
               <Form method="post" className="v-form v-form--tight">
