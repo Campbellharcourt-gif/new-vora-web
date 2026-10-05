@@ -107,15 +107,19 @@ export const SEED_PAGES: {
   },
   {
     key: "terms",
-    title: "Terms",
+    title: "Terms & Conditions",
     intro: null,
-    body: [paragraph("[Draft — terms must be written and approved before publishing.]")],
+    body: [
+      paragraph("[Draft — the Terms & Conditions must be written and approved before publishing.]"),
+    ],
   },
   {
     key: "privacy",
-    title: "Privacy",
+    title: "Privacy Policy",
     intro: null,
-    body: [paragraph("[Draft — privacy notice must be written and approved before publishing.]")],
+    body: [
+      paragraph("[Draft — the Privacy Policy must be written and approved before publishing.]"),
+    ],
   },
   {
     key: "cookies",

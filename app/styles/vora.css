@@ -898,6 +898,36 @@
   .v-footer__legal a:focus-visible {
     color: var(--color-text);
   }
+  .v-legal__related {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3) var(--space-6);
+    margin-top: var(--space-8);
+    padding-top: var(--space-5);
+    border-top: 1px solid var(--color-line);
+    font-size: var(--type-body-s);
+  }
+  .v-auth__foot {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-6) var(--page-margin) var(--space-8);
+    font-size: var(--type-body-s);
+  }
+  .v-auth__foot nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-2);
+    color: var(--color-text-secondary);
+  }
+  .v-auth__foot a {
+    color: var(--color-text-secondary);
+    text-underline-offset: 0.2em;
+  }
+  .v-auth__foot a:hover,
+  .v-auth__foot a:focus-visible {
+    color: var(--color-text);
+  }
   /* A one-line notice above the header (Content › Announcement). Scrolls away; the header stays sticky. */
   .v-announce {
     display: flex;

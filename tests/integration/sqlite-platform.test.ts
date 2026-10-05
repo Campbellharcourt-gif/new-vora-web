@@ -179,6 +179,32 @@ describe("atomic batches (the D1 batch guarantee)", () => {
   });
 });
 
+describe("0004 legal titles (data migration)", () => {
+  it("renames only never-published pages that still carry the seed titles", async () => {
+    const db = await openDatabase({ path: fileDb() });
+    const upTo3 = MIGRATIONS.filter((m) => m.name < "0004");
+    await migrate(db, upTo3);
+    const now = Date.now();
+    const insert = (id: string, key: string, title: string, published: string | null) =>
+      db
+        .prepare(
+          "INSERT INTO pages (id, key, status, title, body, published_version_id, has_unpublished_changes, created_at, updated_at) VALUES (?, ?, 'draft', ?, '[]', ?, 1, ?, ?)",
+        )
+        .bind(id, key, title, published, now, now)
+        .run();
+    await insert("pge_terms", "terms", "Terms", null);
+    await insert("pge_privacy", "privacy", "Our privacy notice", null);
+    const applied = await migrate(db, MIGRATIONS);
+    expect(applied.applied).toEqual(["0004_legal_titles.sql"]);
+    const titles = await db.prepare("SELECT key, title FROM pages ORDER BY key").all();
+    expect(titles.results).toEqual([
+      { key: "privacy", title: "Our privacy notice" }, // edited: left alone
+      { key: "terms", title: "Terms & Conditions" },
+    ]);
+    db.close();
+  });
+});
+
 describe("migrations at start-up (§6.5)", () => {
   it("a fresh file gets every migration; a second start applies none", async () => {
     const path = fileDb();
@@ -189,6 +215,7 @@ describe("migrations at start-up (§6.5)", () => {
       "0001_integrity_triggers.sql",
       "0002_owner_guards.sql",
       "0003_engagement_services.sql",
+      "0004_legal_titles.sql",
     ]);
     expect(first.snapshot).toBeNull(); // nothing to protect in an empty database
     expect((await migrate(db, MIGRATIONS)).applied).toEqual([]);

@@ -9,7 +9,11 @@ import type { Route } from "./+types/legal";
 /** Legal pages are light reading pages with the reading-progress rule (§16.11). */
 export const handle = { theme: "mist", reading: true };
 
-const TITLES = { terms: "Terms", privacy: "Privacy", cookies: "Cookies" } as const;
+const TITLES = {
+  terms: "Terms & Conditions",
+  privacy: "Privacy Policy",
+  cookies: "Cookies",
+} as const;
 type LegalKey = keyof typeof TITLES;
 
 function keyFromUrl(url: string): LegalKey {
@@ -114,6 +118,16 @@ export default function Legal({ loaderData }: Route.ComponentProps) {
           </p>
         </EmptyState>
       )}
+
+      <nav className="v-legal__related" aria-label="Legal">
+        {(Object.keys(TITLES) as LegalKey[])
+          .filter((k) => k !== loaderData.key)
+          .map((k) => (
+            <a key={k} className="v-link" href={`/${k}`}>
+              {TITLES[k]}
+            </a>
+          ))}
+      </nav>
     </article>
   );
 }

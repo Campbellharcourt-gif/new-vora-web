@@ -22,6 +22,13 @@ export default function AuthLayout() {
       <main id="main" className="v-auth__main">
         <Outlet />
       </main>
+      <footer className="v-auth__foot">
+        <nav aria-label="Legal">
+          <Link to="/terms">Terms &amp; Conditions</Link>
+          <span aria-hidden="true">·</span>
+          <Link to="/privacy">Privacy Policy</Link>
+        </nav>
+      </footer>
     </div>
   );
 }

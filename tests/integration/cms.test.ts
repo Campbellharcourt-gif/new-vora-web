@@ -315,3 +315,13 @@ describe("CMS — site copy and social links", () => {
     expect(row?.url).toBe("https://x.com/vora");
   });
 });
+
+describe("legal pages", () => {
+  it("are named Terms & Conditions and Privacy Policy, and stay unpublished until approved", async () => {
+    const rows = await db.select().from(schema.pages).all();
+    const byKey = new Map(rows.map((r) => [r.key, r]));
+    expect(byKey.get("privacy")?.title).toBe("Privacy Policy");
+    expect(byKey.get("privacy")?.publishedVersionId).toBeNull();
+    expect(await getPublishedPage(makeCtx(), "privacy")).toBeNull();
+  });
+});

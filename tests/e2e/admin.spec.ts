@@ -16,6 +16,7 @@ test.beforeAll(async ({ browser }) => {
   await signIn(page, "admin", "/admin");
   await completeCode(page, "admin");
   await expect(page).toHaveURL(/\/admin$/);
+  await page.waitForLoadState("networkidle");
 });
 
 test.afterAll(async () => {
