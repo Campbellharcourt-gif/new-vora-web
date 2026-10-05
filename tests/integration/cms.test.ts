@@ -279,6 +279,15 @@ describe("CMS — site copy and social links", () => {
       }),
     );
     expect(unsafe.code).toBe("validation_failed");
+    const backslash = await appError(
+      setSetting(makeCtx(), manager, "site.announcement", {
+        enabled: true,
+        message: "Hello",
+        linkLabel: "Go",
+        linkHref: "/\\evil.example",
+      }),
+    );
+    expect(backslash.code).toBe("validation_failed");
   });
 
   it("social links are https-only and need social.manage", async () => {

@@ -90,7 +90,9 @@ export const SETTINGS = {
           .trim()
           .max(300)
           .refine(
-            (v) => (v.startsWith("/") && !v.startsWith("//")) || /^https:\/\/[^\s]+$/.test(v),
+            (v) =>
+              (v.startsWith("/") && !v.startsWith("//") && !v.startsWith("/\\")) ||
+              /^https:\/\/[^\s]+$/.test(v),
             "Links must be a site path like /contact or start with https://",
           )
           .nullable(),

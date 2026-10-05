@@ -22,7 +22,9 @@ export interface NotificationInput {
 }
 
 const safeLink = (link: string | null | undefined) =>
-  link?.startsWith("/") && !link.startsWith("//") && !/[\r\n]/.test(link) ? link : null;
+  link?.startsWith("/") && !link.startsWith("//") && !link.startsWith("/\\") && !/[\r\n]/.test(link)
+    ? link
+    : null;
 
 /** Creates one notification per recipient (duplicates in the list are ignored). */
 export async function notify(

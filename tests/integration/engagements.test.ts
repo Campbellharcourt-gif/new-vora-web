@@ -230,6 +230,22 @@ describe("client projects — data isolation", () => {
   });
 });
 
+describe("client messages — rate limit", () => {
+  it("caps how fast one client can post", async () => {
+    const results: string[] = [];
+    for (let i = 0; i < 10; i++) {
+      results.push(
+        await postClientMessage(makeCtx(), clientB, projectB, `Message ${i}`).then(
+          () => "ok",
+          (e: AppError) => e.code,
+        ),
+      );
+    }
+    expect(results).toContain("rate_limited");
+    expect(results[0]).toBe("ok");
+  });
+});
+
 describe("uploads — validation", () => {
   it("decides the type from the bytes and refuses mismatches and active content", async () => {
     const html = new File(["<!doctype html><script>alert(1)</script>"], "page.html", {

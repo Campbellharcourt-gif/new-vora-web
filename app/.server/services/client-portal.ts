@@ -7,6 +7,7 @@ import { errors } from "../lib/errors";
 import { isId, newId } from "../lib/ids";
 import { writeAudit } from "../observability/audit";
 import { notify } from "./notifications";
+import { checkRateLimit } from "./rate-limit";
 
 /**
  * Client-portal read model. Clients see only engagements of organisations they belong to; the
@@ -164,6 +165,10 @@ export async function postClientMessage(
   const text = body.trim();
   if (text.length < 1 || text.length > 5000) {
     throw errors.validation({ body: "Write a message (up to 5,000 characters)." });
+  }
+  // A few messages a minute is plenty; this also caps the notices the team receives.
+  if (!(await checkRateLimit(ctx, "RL_FORMS", "client-message", `user:${actor.userId}`))) {
+    throw errors.rateLimited();
   }
   const now = ctx.clock.now();
   const id = newId("message", now);

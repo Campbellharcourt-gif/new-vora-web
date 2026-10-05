@@ -174,9 +174,12 @@ describe("VORA AI admin tools", () => {
 
   it("the overview never contains the API key", async () => {
     await enable();
-    const env = { ...testEnv, GEMINI_API_KEY: "sk-test-super-secret-value-123" };
+    // A random stand-in key (never a real credential), so its value can't appear by chance.
+    const fakeKey = `fake-${crypto.randomUUID()}`;
+    const env = { ...testEnv, GEMINI_API_KEY: fakeKey };
     const overview = await aiOverview(makeCtx({ env }), manager);
-    expect(JSON.stringify(overview)).not.toContain("sk-test-super-secret-value-123");
+    expect(overview.configured).toBe(true);
+    expect(JSON.stringify(overview)).not.toContain(fakeKey);
     expect(await code(aiOverview(makeCtx(), client))).toBe("forbidden");
   });
 });
