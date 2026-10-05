@@ -44,6 +44,10 @@ export async function loader({ context, request }: Route.LoaderArgs) {
     home: has("pages.publish") ? home : null,
     announcement: has("pages.publish") ? announcement : null,
     socials,
+    platforms: SOCIAL_PLATFORMS.map((p) => ({
+      key: p,
+      label: p === "x" ? "X" : p.charAt(0).toUpperCase() + p.slice(1),
+    })),
   };
 }
 
@@ -101,13 +105,9 @@ export async function action({ context, request }: Route.ActionArgs) {
   }
 }
 
-const PLATFORM_OPTIONS = SOCIAL_PLATFORMS.map((p) => ({
-  key: p,
-  label: p === "x" ? "X" : p.charAt(0).toUpperCase() + p.slice(1),
-}));
 
 export default function Content({ loaderData }: Route.ComponentProps) {
-  const { pages, summary, home, announcement, socials } = loaderData;
+  const { pages, summary, home, announcement, socials, platforms } = loaderData;
   const result = useActionData<typeof action>();
   const busy = useNavigation().state === "submitting";
   const feedback = (intent: string) =>
@@ -277,6 +277,7 @@ export default function Content({ loaderData }: Route.ComponentProps) {
                   <input type="hidden" name="intent" value="social" />
                   <input type="hidden" name="id" value={s.id} />
                   <SocialFields
+                    platforms={platforms}
                     defaults={{
                       platform: s.platform,
                       label: s.label,
@@ -308,6 +309,7 @@ export default function Content({ loaderData }: Route.ComponentProps) {
               <Form method="post" className="v-form v-form--tight">
                 <input type="hidden" name="intent" value="social" />
                 <SocialFields
+                  platforms={platforms}
                   defaults={{
                     platform: "",
                     label: "",
@@ -333,6 +335,7 @@ export default function Content({ loaderData }: Route.ComponentProps) {
 }
 
 function SocialFields(props: {
+  platforms: { key: string; label: string }[];
   defaults: {
     platform: string;
     label: string;
@@ -350,7 +353,7 @@ function SocialFields(props: {
         name="platform"
         label="Platform"
         required
-        options={PLATFORM_OPTIONS}
+        options={props.platforms}
         defaultValue={defaults.platform}
         error={errors.platform}
       />
