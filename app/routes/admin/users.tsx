@@ -1,9 +1,10 @@
-import { DEFAULT_ROLES, getRoleDefinition } from "@shared/permissions";
+import { USER_STATUSES } from "@shared/enums";
 import { emailAddress } from "@shared/validation/common";
-import { data, Form, useActionData, useNavigation } from "react-router";
+import { data, Form, Link, useActionData, useNavigation } from "react-router";
 import { createInvitation } from "~/.server/auth/invitations";
 import { canGrantRole } from "~/.server/auth/rbac";
 import { failureFrom, formString, load, requirePermission } from "~/.server/guards";
+import { grantableRoles, listRoles } from "~/.server/services/roles";
 import { listUsers } from "~/.server/services/users";
 import { Button, ChoiceGroup, ErrorSummary, Notice, TextField } from "~/components/ui/forms";
 import { StatusIndicator, type StatusKind } from "~/components/vora/primitives";
@@ -12,16 +13,28 @@ import type { Route } from "./+types/users";
 
 export async function loader({ context, request }: Route.LoaderArgs) {
   const actor = await requirePermission(context, request, "users.view");
-  const users = await listUsers(load(context).server, actor);
+  const { server } = load(context);
+  const url = new URL(request.url);
+  const filter = {
+    q: url.searchParams.get("q")?.slice(0, 100) ?? "",
+    role: url.searchParams.get("role") ?? "",
+    status: url.searchParams.get("status") ?? "",
+  };
+  const [users, roles] = await Promise.all([
+    listUsers(server, actor, filter),
+    listRoles(server, actor),
+  ]);
+  const names = new Map(roles.map((r) => [r.key, r.name]));
   const grantable = actor.permissions.has("users.invite")
-    ? DEFAULT_ROLES.filter((r) => canGrantRole(actor, r.rank, r.key)).map((r) => ({
-        key: r.key,
-        label: r.name,
-      }))
+    ? (await grantableRoles(server, actor))
+        .filter((r) => canGrantRole(actor, r.rank, r.key))
+        .map((r) => ({ key: r.key, label: r.name }))
     : [];
   return {
-    users: users.map((u) => ({ ...u, roles: u.roles.map((k) => getRoleDefinition(k)?.name ?? k) })),
+    users: users.map((u) => ({ ...u, roles: u.roles.map((k) => names.get(k) ?? k) })),
+    roleOptions: roles.map((r) => ({ key: r.key, label: r.name })),
     grantable,
+    filter,
   };
 }
 
@@ -75,13 +88,85 @@ export default function Users({ loaderData }: Route.ComponentProps) {
   const busy = useNavigation().state === "submitting";
   return (
     <>
-      <PageHeading eyebrow="Admin" title="Users" />
+      <PageHeading
+        eyebrow="Admin"
+        title="Users"
+        description="Everyone with an account: staff, clients and members."
+        actions={
+          <Link className="v-btn v-btn--secondary v-btn--s" to="/admin/roles">
+            Roles and permissions
+          </Link>
+        }
+      />
+      <Form method="get" className="v-filters" aria-label="Filter users">
+        <div className="v-field">
+          <label className="v-label" htmlFor="users-q">
+            Search
+          </label>
+          <input
+            id="users-q"
+            name="q"
+            type="search"
+            className="v-input"
+            defaultValue={loaderData.filter.q}
+            placeholder="Name or email"
+          />
+        </div>
+        <div className="v-field">
+          <label className="v-label" htmlFor="users-role">
+            Role
+          </label>
+          <span className="v-selectwrap">
+            <select
+              id="users-role"
+              name="role"
+              className="v-select"
+              defaultValue={loaderData.filter.role}
+            >
+              <option value="">All roles</option>
+              {loaderData.roleOptions.map((r) => (
+                <option key={r.key} value={r.key}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </span>
+        </div>
+        <div className="v-field">
+          <label className="v-label" htmlFor="users-status">
+            Status
+          </label>
+          <span className="v-selectwrap">
+            <select
+              id="users-status"
+              name="status"
+              className="v-select"
+              defaultValue={loaderData.filter.status}
+            >
+              <option value="">Any status</option>
+              {USER_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </span>
+        </div>
+        <button type="submit" className="v-btn v-btn--secondary v-btn--s">
+          Filter
+        </button>
+      </Form>
       {result?.ok ? <Notice tone="success">{result.message}</Notice> : null}
       {result && !result.ok ? (
         <ErrorSummary message={result.message} fields={result.fields} />
       ) : null}
 
       <Panel title="People" flush>
+        {loaderData.users.length === 0 ? (
+          <div className="v-panel__body">
+            <p className="v-body">No one matches.</p>
+          </div>
+        ) : null}
         <div className="v-tablewrap">
           <table className="v-table v-table--stack">
             <caption className="v-sr">People</caption>
@@ -97,7 +182,9 @@ export default function Users({ loaderData }: Route.ComponentProps) {
             <tbody>
               {loaderData.users.map((u) => (
                 <tr key={u.id}>
-                  <td>{u.name}</td>
+                  <td>
+                    <Link to={`/admin/users/${u.id}`}>{u.name}</Link>
+                  </td>
                   <td data-label="Email" style={{ overflowWrap: "anywhere" }}>
                     {u.email}
                   </td>

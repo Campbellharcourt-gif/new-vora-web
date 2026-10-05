@@ -1,4 +1,5 @@
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { USER_STATUSES } from "@shared/enums";
+import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { activeOwnerExists } from "../auth/bootstrap";
 import {
   authorize,
@@ -16,8 +17,43 @@ import { isId } from "../lib/ids";
 import { writeAudit } from "../observability/audit";
 import { recordSecurityEvent } from "../observability/security-events";
 
-export async function listUsers(ctx: ServerContext, actorInput: Actor | null) {
+export interface UserFilter {
+  q?: string;
+  role?: string;
+  status?: string;
+}
+
+export async function listUsers(
+  ctx: ServerContext,
+  actorInput: Actor | null,
+  filter: UserFilter = {},
+) {
   await authorize(ctx, actorInput, "users.view");
+  const conditions = [isNull(schema.users.deletedAt)];
+  if (USER_STATUSES.includes(filter.status as never)) {
+    conditions.push(eq(schema.users.status, filter.status as never));
+  }
+  if (filter.role && /^[a-z][a-z_]{0,39}$/.test(filter.role)) {
+    conditions.push(
+      inArray(
+        schema.users.id,
+        ctx.db
+          .select({ id: schema.userRoles.userId })
+          .from(schema.userRoles)
+          .innerJoin(schema.roles, eq(schema.roles.id, schema.userRoles.roleId))
+          .where(eq(schema.roles.key, filter.role)),
+      ),
+    );
+  }
+  const q = filter.q?.trim().toLowerCase().slice(0, 100);
+  if (q) {
+    const pattern = `%${q.replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
+    const match = or(
+      sql`lower(${schema.users.name}) like ${pattern} escape '\\'`,
+      sql`${schema.users.email} like ${pattern} escape '\\'`,
+    );
+    if (match) conditions.push(match);
+  }
   const rows = await ctx.db
     .select({
       id: schema.users.id,
@@ -31,11 +67,139 @@ export async function listUsers(ctx: ServerContext, actorInput: Actor | null) {
     .from(schema.users)
     .leftJoin(schema.userRoles, eq(schema.userRoles.userId, schema.users.id))
     .leftJoin(schema.roles, eq(schema.roles.id, schema.userRoles.roleId))
-    .where(isNull(schema.users.deletedAt))
+    .where(and(...conditions))
     .groupBy(schema.users.id)
     .orderBy(asc(schema.users.createdAt))
     .all();
   return rows.map((r) => ({ ...r, roles: r.roles ? r.roles.split(",").sort() : [] }));
+}
+
+/** Everything the user page shows, filtered by what the viewer may see. */
+export async function getUserDetail(ctx: ServerContext, actorInput: Actor | null, userId: string) {
+  const actor = await authorize(ctx, actorInput, "users.view");
+  const { user, access } = await loadTarget(ctx, userId);
+  const has = (p: Parameters<typeof actor.permissions.has>[0]) => actor.permissions.has(p);
+  const [roles, orgs, sessions, logins, activity] = await Promise.all([
+    ctx.db
+      .select({ key: schema.roles.key, name: schema.roles.name, isSystem: schema.roles.isSystem })
+      .from(schema.userRoles)
+      .innerJoin(schema.roles, eq(schema.roles.id, schema.userRoles.roleId))
+      .where(eq(schema.userRoles.userId, userId))
+      .orderBy(desc(schema.roles.rank))
+      .all(),
+    has("clients.view")
+      ? ctx.db
+          .select({
+            id: schema.clientOrgs.id,
+            name: schema.clientOrgs.name,
+            orgRole: schema.clientOrgMembers.orgRole,
+          })
+          .from(schema.clientOrgMembers)
+          .innerJoin(schema.clientOrgs, eq(schema.clientOrgs.id, schema.clientOrgMembers.orgId))
+          .where(eq(schema.clientOrgMembers.userId, userId))
+          .all()
+      : Promise.resolve([]),
+    ctx.db
+      .select({ n: sql<number>`count(*)` })
+      .from(schema.sessions)
+      .where(
+        and(
+          eq(schema.sessions.userId, userId),
+          isNull(schema.sessions.revokedAt),
+          sql`${schema.sessions.expiresAt} > ${ctx.clock.now()}`,
+        ),
+      )
+      .get(),
+    has("security.view")
+      ? ctx.db
+          .select({
+            id: schema.loginAttempts.id,
+            outcome: schema.loginAttempts.outcome,
+            country: schema.loginAttempts.country,
+            city: schema.loginAttempts.city,
+            createdAt: schema.loginAttempts.createdAt,
+          })
+          .from(schema.loginAttempts)
+          .where(eq(schema.loginAttempts.userId, userId))
+          .orderBy(desc(schema.loginAttempts.createdAt))
+          .limit(10)
+          .all()
+      : Promise.resolve([]),
+    has("audit.view")
+      ? ctx.db
+          .select({
+            id: schema.auditLogs.id,
+            summary: schema.auditLogs.summary,
+            action: schema.auditLogs.action,
+            actorName: schema.users.name,
+            createdAt: schema.auditLogs.createdAt,
+          })
+          .from(schema.auditLogs)
+          .leftJoin(schema.users, eq(schema.users.id, schema.auditLogs.actorUserId))
+          .where(
+            or(
+              and(eq(schema.auditLogs.targetType, "user"), eq(schema.auditLogs.targetId, userId)),
+              eq(schema.auditLogs.actorUserId, userId),
+            ),
+          )
+          .orderBy(desc(schema.auditLogs.createdAt))
+          .limit(20)
+          .all()
+      : Promise.resolve([]),
+  ]);
+  const manageable = canManageUser(actor, { userId, rank: access.rank });
+  return {
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      status: user.status,
+      emailVerifiedAt: user.emailVerifiedAt,
+      lastLoginAt: user.lastLoginAt,
+      createdAt: user.createdAt,
+      twoStep: access.privileged || user.mfaEnforced,
+    },
+    roles,
+    rank: access.rank,
+    orgs,
+    activeSessions: Number(sessions?.n ?? 0),
+    logins,
+    activity,
+    can: {
+      manage: has("users.manage") && manageable,
+      assignRoles:
+        has("roles.assign") &&
+        (manageable || (actor.roles.includes("owner") && actor.userId !== userId)),
+    },
+  };
+}
+
+/** Signs a lower-ranked user out everywhere (e.g. a lost laptop). */
+export async function revokeSessionsForUser(
+  ctx: ServerContext,
+  actorInput: Actor | null,
+  userId: string,
+): Promise<number> {
+  const actor = await authorize(ctx, actorInput, "users.manage");
+  const { access } = await loadTarget(ctx, userId);
+  if (!canManageUser(actor, { userId, rank: access.rank })) {
+    throw errors.forbidden({ reason: "rank" });
+  }
+  const count = await revokeUserSessions(ctx, userId, "revoked_by_admin");
+  await recordSecurityEvent(ctx, {
+    type: "auth.sessions.revoked_by_admin",
+    severity: "medium",
+    userId,
+    details: { by: actor.userId, count },
+  });
+  await writeAudit(ctx, actor, {
+    action: "user.sessions.revoke",
+    targetType: "user",
+    targetId: userId,
+    summary: `Signed the user out everywhere (${count} session${count === 1 ? "" : "s"})`,
+    changes: { count },
+  });
+  return count;
 }
 
 async function loadTarget(ctx: ServerContext, userId: string) {

@@ -36,6 +36,7 @@ const SCREENS = [
   ["/admin/partners", /^Partners$/],
   ["/admin/careers", /^Careers$/],
   ["/admin/users", /^Users$/],
+  ["/admin/roles", /^Roles and permissions$/],
   ["/admin/security", /^Security$/],
   ["/admin/audit", /^Audit log$/],
   ["/admin/settings", /^Settings$/],
@@ -53,6 +54,10 @@ test.describe("admin workspace", () => {
       await page.waitForLoadState("networkidle");
       expect(problems, path).toEqual([]);
     }
+    // A person's page opens from the users list.
+    await page.goto("/admin/users");
+    await page.getByRole("table").getByRole("link").first().click();
+    await expect(page.getByText("Two-step sign-in")).toBeVisible();
   });
 
   test("a case study is drafted, published, and only the published version is public", async ({

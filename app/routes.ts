@@ -60,6 +60,8 @@ export default [
     route("security", "routes/admin/security.tsx"),
     route("audit", "routes/admin/audit.tsx"),
     route("users", "routes/admin/users.tsx"),
+    route("users/:id", "routes/admin/user.tsx"),
+    route("roles", "routes/admin/roles.tsx"),
     route("system", "routes/admin/system.tsx"),
   ]),
   route("client", "routes/client/_layout.tsx", [
