@@ -121,4 +121,4 @@ Hero (3) · Public site (4) · Backend/CMS/admin (5) · Portals (6) · VORA AI (
 - [x] Enquiry “What happens after sending” copy; legal page names and footer links
 - [!] Legal documents — supplied separately; publish them in Admin › Content
 - [ ] WebKit/Firefox E2E (`npm run test:e2e:browsers`) — NOT VERIFIED here
-- [ ] Not deployed — awaiting your review and approval
+- [~] Deployed to Railway staging (auto-deploy, status success); live site not checked from the sandbox

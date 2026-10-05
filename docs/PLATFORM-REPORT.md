@@ -208,9 +208,18 @@ files, 4 new E2E specs, 1 new unit file, 9 updated. Full list: `git diff --name-
 
 ## 10. Deployment status
 
-**Not deployed and not verified in any hosted environment.** All work is committed and pushed to
-`claude/charming-newton-fuhcej`; `main` was not touched. No Railway, Cloudflare, R2, Resend,
-Turnstile or Gemini settings were changed and no secrets were created. If a hosted service builds
-this branch automatically, those builds were not triggered or checked by me. This is not a
-production-ready claim: it needs your review, the WebKit/Firefox runs, the legal documents and the
-configuration in §5 first.
+**Deployed to Railway (staging) by push; health-checked by Railway; not verified from outside.**
+
+- Railway's GitHub integration deploys every push to `claude/charming-newton-fuhcej` (project
+  “resplendent-truth”, Railway environment named “production” — the service behind
+  staging.vorawebsites.store, `APP_ENV=staging`). `main` was not touched.
+- GitHub deployment records: `8a497f6` (this work's final code) → **success**, 5 Oct 2026 12:38 UTC.
+  Every push from `7de01ee` on succeeded. Two did not build and never went live: `fd7fdc8` (a
+  build error fixed in `7de01ee`) and the pushed admin commits of 1 Oct (`411b8d4` and others) —
+  Railway kept the previous version running for those.
+- Railway only marks a deploy successful after `/api/health/live` passes, which requires every
+  migration to be applied, so `0003` and `0004` ran on the staging database at start-up.
+- **Not verified:** the live site itself. This build sandbox's network policy blocks
+  staging.vorawebsites.store, so no page or health check was fetched from here.
+- No Railway, Cloudflare, R2, Resend, Turnstile or Gemini settings were changed and no secrets were
+  created. This is a staging deployment, not a production-ready claim.

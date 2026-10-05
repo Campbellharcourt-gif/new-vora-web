@@ -628,3 +628,7 @@ build with a throwaway local database.
 **What it does not prove:** anything about a hosted environment (nothing was deployed), Safari or
 Firefox behaviour, real email delivery, real Turnstile or a real Gemini key (fakes and the capture
 transport were used), or the legal text (not supplied, so not published).
+
+**Deployment (same day):** Railway deployed `8a497f6` from this branch automatically on push —
+GitHub deployment status **success** (12:38 UTC). The live staging site was **NOT VERIFIED** from
+the build sandbox: its network policy blocks staging.vorawebsites.store.
