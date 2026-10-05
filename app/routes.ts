@@ -37,6 +37,9 @@ export default [
   route("account", "routes/account/_layout.tsx", [
     index("routes/account/index.tsx"),
     route("security", "routes/account/security.tsx"),
+    route("privacy", "routes/account/privacy.tsx"),
+    route("privacy/export", "routes/account/privacy-export.ts"),
+    route("notifications", "routes/account/notifications.tsx"),
   ]),
   route("admin", "routes/admin/_layout.tsx", [
     index("routes/admin/dashboard.tsx"),
@@ -62,6 +65,7 @@ export default [
     route("users", "routes/admin/users.tsx"),
     route("users/:id", "routes/admin/user.tsx"),
     route("roles", "routes/admin/roles.tsx"),
+    route("privacy", "routes/admin/privacy.tsx"),
     route("system", "routes/admin/system.tsx"),
   ]),
   route("client", "routes/client/_layout.tsx", [

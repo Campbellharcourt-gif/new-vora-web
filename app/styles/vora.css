@@ -2764,6 +2764,9 @@
     min-width: 0;
     overflow-wrap: anywhere;
   }
+  .v-strong {
+    font-weight: 600;
+  }
   .v-actions {
     display: flex;
     flex-wrap: wrap;

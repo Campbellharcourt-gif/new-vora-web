@@ -37,6 +37,7 @@ const SCREENS = [
   ["/admin/careers", /^Careers$/],
   ["/admin/users", /^Users$/],
   ["/admin/roles", /^Roles and permissions$/],
+  ["/admin/privacy", /^Privacy requests$/],
   ["/admin/security", /^Security$/],
   ["/admin/audit", /^Audit log$/],
   ["/admin/settings", /^Settings$/],

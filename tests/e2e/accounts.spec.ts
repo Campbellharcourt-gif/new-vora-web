@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
+import { credentials, signIn } from "./support";
 
 /** Latest link with this path prefix in mail sent to an address (local capture mailbox). */
 async function mailedLink(page: Page, email: string, path: string): Promise<string> {
@@ -80,5 +82,25 @@ test.describe("create an account (Client or Member)", () => {
       },
     });
     expect(res.status()).toBe(400);
+  });
+});
+
+test.describe("account privacy and notifications", () => {
+  test("a member confirms their password and downloads their data", async ({ page }) => {
+    await signIn(page, "member");
+    await expect(page).toHaveURL(/\/member$/);
+    await page.goto("/account/notifications");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Notifications");
+    await page.goto("/account/privacy");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Privacy");
+    await page.getByLabel("Confirm your password").first().fill(credentials("member").password);
+    await page.getByRole("button", { name: "Confirm" }).first().click();
+    const downloading = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download my data (JSON)" }).click();
+    const download = await downloading;
+    expect(download.suggestedFilename()).toMatch(/^vora-account-data-\d{4}-\d{2}-\d{2}\.json$/);
+    const data = JSON.parse(readFileSync((await download.path()) ?? "", "utf8"));
+    expect(data.account.email).toBe(credentials("member").email);
+    expect(JSON.stringify(data)).not.toMatch(/argon2|passwordHash/);
   });
 });

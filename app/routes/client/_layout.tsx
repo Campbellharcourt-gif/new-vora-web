@@ -1,11 +1,13 @@
 import { Outlet } from "react-router";
-import { requirePermission } from "~/.server/guards";
+import { load, requirePermission } from "~/.server/guards";
+import { unreadNotificationCount } from "~/.server/services/notifications";
 import { WorkspaceShell } from "~/components/workspace/WorkspaceShell";
 import type { Route } from "./+types/_layout";
 
 export async function loader({ context, request }: Route.LoaderArgs) {
   const actor = await requirePermission(context, request, "client_portal.access");
-  return { user: { name: actor.name, email: actor.email } };
+  const unread = await unreadNotificationCount(load(context).server, actor);
+  return { user: { name: actor.name, email: actor.email }, unread };
 }
 
 export function meta(): Route.MetaDescriptors {
@@ -18,7 +20,13 @@ export default function ClientLayout({ loaderData }: Route.ComponentProps) {
       area="Client portal"
       user={loaderData.user}
       nav={[{ to: "/client", label: "Projects", end: true }]}
-      switchTo={[{ to: "/account/security", label: "Your account" }]}
+      switchTo={[
+        {
+          to: "/account/notifications",
+          label: loaderData.unread > 0 ? `Notifications (${loaderData.unread})` : "Notifications",
+        },
+        { to: "/account", label: "Your account" },
+      ]}
     >
       <Outlet />
     </WorkspaceShell>
