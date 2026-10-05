@@ -5,7 +5,9 @@ import { getSecurityOverview, revokeOtherSessions, revokeOwnSession } from "../a
 import { authorize } from "../auth/rbac";
 import type { KernelEnv } from "../kernel/types";
 import { errors } from "../lib/errors";
+import { openEngagementFile } from "../services/engagements";
 import { submitEnquiry } from "../services/enquiries";
+import { downloadHeaders } from "../services/files";
 import { checkDatabase, checkLive, publicHealth, systemHealth } from "../services/health";
 import { apiError, readJson } from "./respond";
 
@@ -106,6 +108,19 @@ export function createApi() {
         throw errors.validation({ _form: "The request was not in the expected format." });
       const answer = await askVora(c.get("server"), c.get("actor"), parsed.data.messages);
       return c.json(answer, 200, { "Cache-Control": "no-store" });
+    } catch (error) {
+      return apiError(c, error);
+    }
+  });
+
+  // --- Private files (client projects): policy-checked downloads, never public ---------------
+  api.get("/v1/files/:id", async (c) => {
+    try {
+      const file = await openEngagementFile(c.get("server"), c.get("actor"), c.req.param("id"));
+      return new Response(file.object.body, {
+        status: 200,
+        headers: downloadHeaders({ name: file.name, mime: file.mime, size: file.size }),
+      });
     } catch (error) {
       return apiError(c, error);
     }

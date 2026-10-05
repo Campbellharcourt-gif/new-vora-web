@@ -67,6 +67,44 @@ export const SETTINGS = {
       ],
     },
   },
+  /** Home page lines. "*word*" sets one word in italics; a null invitation keeps the copy slot. */
+  "home.copy": {
+    schema: z.object({
+      approachLines: z.array(z.string().trim().min(1).max(120)).min(1).max(3),
+      invitationLine: z.string().trim().max(160).nullable(),
+    }),
+    default: {
+      approachLines: ["Great ideas. Average *presence.*", "VORA starts with websites."],
+      invitationLine: null,
+    },
+  },
+  /** A one-line site-wide notice above the header. Off by default. */
+  "site.announcement": {
+    schema: z
+      .object({
+        enabled: z.boolean(),
+        message: z.string().trim().max(200),
+        linkLabel: z.string().trim().max(60).nullable(),
+        linkHref: z
+          .string()
+          .trim()
+          .max(300)
+          .refine(
+            (v) => (v.startsWith("/") && !v.startsWith("//")) || /^https:\/\/[^\s]+$/.test(v),
+            "Links must be a site path like /contact or start with https://",
+          )
+          .nullable(),
+      })
+      .refine((v) => !v.enabled || v.message.length > 0, {
+        path: ["message"],
+        message: "Write the announcement before switching it on.",
+      })
+      .refine((v) => (v.linkLabel === null) === (v.linkHref === null), {
+        path: ["linkHref"],
+        message: "Give the link both a label and an address, or neither.",
+      }),
+    default: { enabled: false, message: "", linkLabel: null, linkHref: null },
+  },
   maintenance: {
     schema: z.object({
       enabled: z.boolean(),
@@ -166,6 +204,8 @@ export const SETTING_PERMISSIONS: Record<SettingKey, Permission> = {
   "site.identity": "settings.manage",
   "contact.emails": "settings.manage",
   "enquiry.options": "settings.manage",
+  "home.copy": "pages.publish",
+  "site.announcement": "pages.publish",
   maintenance: "maintenance.manage",
   retention: "settings.manage",
   "ai.config": "ai.manage",

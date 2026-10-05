@@ -63,6 +63,24 @@ export const ENGAGEMENT_STATUSES = [
 ] as const;
 export type EngagementStatus = (typeof ENGAGEMENT_STATUSES)[number];
 
+export const ENGAGEMENT_STATUS_LABELS: Record<EngagementStatus, string> = {
+  planning: "Planning",
+  in_progress: "In progress",
+  review: "In review",
+  delivered: "Delivered",
+  on_hold: "On hold",
+  closed: "Closed",
+};
+
+export const MILESTONE_STATUSES = ["upcoming", "in_progress", "done", "blocked"] as const;
+export type MilestoneStatus = (typeof MILESTONE_STATUSES)[number];
+export const MILESTONE_STATUS_LABELS: Record<MilestoneStatus, string> = {
+  upcoming: "Upcoming",
+  in_progress: "In progress",
+  done: "Done",
+  blocked: "Blocked",
+};
+
 export const SERVICE_DELIVERY_MODELS = ["vora", "partner", "joint"] as const;
 export type ServiceDeliveryModel = (typeof SERVICE_DELIVERY_MODELS)[number];
 

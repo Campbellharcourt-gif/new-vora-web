@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { load } from "~/.server/guards";
 import { listPublishedProjects, listPublishedServices } from "~/.server/services/published-content";
 import { getSetting } from "~/.server/services/settings";
@@ -23,11 +23,12 @@ import type { Route } from "./+types/home";
 
 export async function loader({ context }: Route.LoaderArgs) {
   const { server } = load(context);
-  const [projects, services, identity, emails] = await Promise.all([
+  const [projects, services, identity, emails, copy] = await Promise.all([
     listPublishedProjects(server),
     listPublishedServices(server),
     getSetting(server, "site.identity"),
     getSetting(server, "contact.emails"),
+    getSetting(server, "home.copy"),
   ]);
   // Chambers shows the featured projects; with none marked featured, the published ones.
   const featured = projects.filter((p) => p.isFeatured);
@@ -49,6 +50,8 @@ export async function loader({ context }: Route.LoaderArgs) {
     partnerLine: identity.partnerLine,
     tagline: identity.tagline,
     projectsEmail: emails.projects,
+    approachLines: copy.approachLines,
+    invitationLine: copy.invitationLine,
   };
 }
 
@@ -64,6 +67,19 @@ export function meta(): Route.MetaDescriptors {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
+/** Admin-edited lines mark one italic phrase as *phrase* (Content › Home page). */
+function emphasised(line: string): ReactNode {
+  const match = /^(.*?)\*([^*]+)\*(.*)$/.exec(line);
+  if (!match) return line;
+  return (
+    <>
+      {match[1]}
+      <Em>{match[2]}</Em>
+      {match[3]}
+    </>
+  );
+}
+
 /**
  * Home — the station sequence (design system §16.1) in its T0 typographic version: the
  * Blender plates and real-time layer (D9) are not supplied yet, so each station is a composed
@@ -71,7 +87,8 @@ const pad = (n: number) => String(n).padStart(2, "0");
  * later without restructuring the page. Copy is real (Mark4) or a marked slot.
  */
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { projects, services, partnerLine, tagline, projectsEmail } = loaderData;
+  const { projects, services, partnerLine, tagline, projectsEmail, approachLines, invitationLine } =
+    loaderData;
   let index = 0;
   const next = () => pad(++index);
   const approachIndex = next();
@@ -116,12 +133,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               as="h2"
               id="home-approach"
               className="v-display-m"
-              lines={[
-                <>
-                  Great ideas. Average <Em>presence.</Em>
-                </>,
-                "VORA starts with websites.",
-              ]}
+              lines={approachLines.map(emphasised)}
             />
           </div>
         </div>
@@ -203,7 +215,12 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       ) : null}
 
       {/* 6 · Horizon — the invitation. */}
-      <Invitation line={<Slot>Home invitation — copy slot</Slot>} email={projectsEmail} />
+      <Invitation
+        line={
+          invitationLine ? emphasised(invitationLine) : <Slot>Home invitation — copy slot</Slot>
+        }
+        email={projectsEmail}
+      />
     </>
   );
 }

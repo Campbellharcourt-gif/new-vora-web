@@ -1,10 +1,182 @@
-import { data, Form, useActionData, useNavigation } from "react-router";
-import { actionError, formString, load, requirePermission } from "~/.server/guards";
-import { createEngagement, listAdminEngagements, updateEngagement } from "~/.server/services/admin-crud";
-import { Button, ErrorSummary, TextField } from "~/components/ui/forms";
-import { PageHeading, Panel } from "~/components/workspace/WorkspaceShell";
+import { ENGAGEMENT_STATUS_LABELS, ENGAGEMENT_STATUSES } from "@shared/enums";
+import { Form, Link, redirect, useActionData, useNavigation } from "react-router";
+import { actionError, load, requirePermission } from "~/.server/guards";
+import { listClients, listEngagements, saveEngagement } from "~/.server/services/engagements";
+import { Button, ErrorSummary, FormScope, Select, TextField } from "~/components/ui/forms";
+import { EngagementStatusTag } from "~/components/workspace/status";
+import { formatDateTime, PageHeading, Panel } from "~/components/workspace/WorkspaceShell";
 import type { Route } from "./+types/engagements";
 
-export async function loader({context,request}:Route.LoaderArgs){const actor=await requirePermission(context,request,"engagements.view");return{items:await listAdminEngagements(load(context).server,actor)}}
-export async function action({context,request}:Route.ActionArgs){const form=await request.formData(),intent=formString(form,"intent"),server=load(context).server;try{const actor=await requirePermission(context,request,"engagements.manage");if(intent==="create"){await createEngagement(server,actor,Object.fromEntries(form));return data({ok:true,message:"Engagement created."})}if(intent==="update"){await updateEngagement(server,actor,formString(form,"id"),Object.fromEntries(form));return data({ok:true,message:"Engagement saved."})}return data({ok:false,message:"Unknown action.",fields:{}},{status:400})}catch(e){return actionError(e)}}
-export default function Engagements({loaderData}:Route.ComponentProps){const result=useActionData<typeof action>();const busy=useNavigation().state==="submitting";return <><PageHeading eyebrow="Admin" title="Engagements" description="Run client work from planning through delivery."/><Panel title="New engagement"><Form method="post" className="v-form v-form--tight"><input type="hidden" name="intent" value="create"/><TextField name="orgId" label="Client organisation ID" required/><TextField name="name" label="Name" required/><TextField name="summary" label="Summary"/><TextField name="startDate" label="Start date" type="date"/><TextField name="targetDate" label="Target date" type="date"/><label className="v-label">Status<select className="v-select" name="status" defaultValue="planning"><option value="planning">Planning</option><option value="in_progress">In progress</option><option value="review">Review</option><option value="delivered">Delivered</option><option value="on_hold">On hold</option><option value="closed">Closed</option></select></label><Button busy={busy} size="s">Create engagement</Button></Form></Panel>{result?.ok?<p className="v-notice v-notice--success">{result.message}</p>:null}{result&&!result.ok?<ErrorSummary message={result.message} fields={result.fields}/>:null}<Panel title="Engagements" flush><div className="v-tablewrap"><table className="v-table v-table--stack"><caption className="v-sr">Engagements</caption><thead><tr><th>Name</th><th>Client</th><th>Status</th><th>Dates</th></tr></thead><tbody>{loaderData.items.map(e=><tr key={e.id}><td><strong>{e.name}</strong><div className="v-body-s">{e.id}</div></td><td>{e.orgName}</td><td><Form method="post" className="v-inline-form"><input type="hidden" name="intent" value="update"/><input type="hidden" name="id" value={e.id}/><input type="hidden" name="name" value={e.name}/><input type="hidden" name="summary" value={e.summary ?? ""}/><input type="hidden" name="startDate" value={e.startDate ?? ""}/><input type="hidden" name="targetDate" value={e.targetDate ?? ""}/><select className="v-select" name="status" defaultValue={e.status}><option value="planning">Planning</option><option value="in_progress">In progress</option><option value="review">Review</option><option value="delivered">Delivered</option><option value="on_hold">On hold</option><option value="closed">Closed</option></select><button className="v-btn v-btn--secondary v-btn--s">Save</button></Form></td><td>{e.startDate??"—"} → {e.targetDate??"—"}</td></tr>)}</tbody></table></div></Panel></>}
+export async function loader({ context, request }: Route.LoaderArgs) {
+  const actor = await requirePermission(context, request, "engagements.view");
+  const { server } = load(context);
+  const url = new URL(request.url);
+  const q = url.searchParams.get("q")?.slice(0, 80) ?? "";
+  const status = url.searchParams.get("status") ?? "";
+  const canCreate =
+    actor.permissions.has("clients.manage") && actor.permissions.has("engagements.manage");
+  const [items, clients] = await Promise.all([
+    listEngagements(server, actor, { q, status }),
+    canCreate ? listClients(server, actor) : Promise.resolve([]),
+  ]);
+  return {
+    items,
+    q,
+    status,
+    canCreate,
+    clients: clients.map((c) => ({ key: c.id, label: c.name })),
+    scopedToAssigned: actor.rank < 60,
+  };
+}
+
+export async function action({ context, request }: Route.ActionArgs) {
+  const actor = await requirePermission(context, request, "engagements.manage");
+  const form = await request.formData();
+  try {
+    const id = await saveEngagement(load(context).server, actor, null, {
+      ...Object.fromEntries(form),
+      status: "planning",
+    });
+    return redirect(`/admin/engagements/${id}?created=1`);
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export function meta(): Route.MetaDescriptors {
+  return [{ title: "Client projects — Admin — VORA" }];
+}
+
+export default function Engagements({ loaderData }: Route.ComponentProps) {
+  const { items, q, status, canCreate, clients, scopedToAssigned } = loaderData;
+  const result = useActionData<typeof action>();
+  const busy = useNavigation().state === "submitting";
+  return (
+    <>
+      <PageHeading
+        eyebrow="Clients"
+        title="Client projects"
+        description={
+          scopedToAssigned
+            ? "The client projects you're assigned to."
+            : "Every client project: team, services, milestones, updates and files."
+        }
+      />
+      <Form method="get" className="v-filters" aria-label="Filter projects">
+        <div className="v-field">
+          <label className="v-label" htmlFor="eng-q">
+            Search
+          </label>
+          <input id="eng-q" name="q" type="search" className="v-input" defaultValue={q} />
+        </div>
+        <div className="v-field">
+          <label className="v-label" htmlFor="eng-status">
+            Status
+          </label>
+          <span className="v-selectwrap">
+            <select id="eng-status" name="status" className="v-select" defaultValue={status}>
+              <option value="">All statuses</option>
+              {ENGAGEMENT_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {ENGAGEMENT_STATUS_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          </span>
+        </div>
+        <button type="submit" className="v-btn v-btn--secondary v-btn--s">
+          Filter
+        </button>
+      </Form>
+
+      <Panel flush>
+        {items.length === 0 ? (
+          <div className="v-panel__body">
+            <p className="v-body">
+              {q || status
+                ? "No projects match."
+                : scopedToAssigned
+                  ? "You aren't assigned to any client projects yet."
+                  : "No client projects yet."}
+            </p>
+          </div>
+        ) : (
+          <div className="v-tablewrap">
+            <table className="v-table v-table--stack">
+              <caption className="v-sr">Client projects</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Project</th>
+                  <th scope="col">Client</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Target</th>
+                  <th scope="col">Updated</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((e) => (
+                  <tr key={e.id}>
+                    <td>
+                      <Link to={`/admin/engagements/${e.id}`}>{e.name}</Link>
+                    </td>
+                    <td data-label="Client">{e.orgName}</td>
+                    <td data-label="Status">
+                      <EngagementStatusTag status={e.status} />
+                    </td>
+                    <td data-label="Target" className="v-data">
+                      {e.targetDate ?? "—"}
+                    </td>
+                    <td data-label="Updated" className="v-data">
+                      {formatDateTime(e.updatedAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
+
+      {canCreate ? (
+        <Panel title="New client project">
+          {clients.length === 0 ? (
+            <p className="v-body-s">
+              Create the <Link to="/admin/clients">client</Link> first.
+            </p>
+          ) : (
+            <>
+              {result && !result.ok ? (
+                <ErrorSummary message={result.message} fields={result.fields} />
+              ) : null}
+              <FormScope prefix="new-engagement">
+                <Form method="post" className="v-form v-form--tight">
+                  <Select
+                    name="orgId"
+                    label="Client"
+                    required
+                    options={clients}
+                    error={result && !result.ok ? result.fields.orgId : undefined}
+                  />
+                  <TextField
+                    name="name"
+                    label="Project name"
+                    required
+                    maxLength={160}
+                    error={result && !result.ok ? result.fields.name : undefined}
+                  />
+                  <TextField name="startDate" label="Start date" type="date" />
+                  <TextField name="targetDate" label="Target date" type="date" />
+                  <div>
+                    <Button busy={busy} size="s">
+                      Create project
+                    </Button>
+                  </div>
+                </Form>
+              </FormScope>
+            </>
+          )}
+        </Panel>
+      ) : null}
+    </>
+  );
+}

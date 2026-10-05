@@ -1,5 +1,10 @@
 import { index, layout, type RouteConfig, route } from "@react-router/dev/routes";
 
+/**
+ * Route map (see docs/01-ARCHITECTURE.md §3). Public pages share the site layout; auth pages the
+ * minimal auth layout; account/admin/client/member are guarded areas using the workspace theme.
+ * Legacy Mark4 URLs are redirected in the kernel before React Router runs.
+ */
 export default [
   layout("routes/public/_layout.tsx", [
     index("routes/public/home.tsx"),
@@ -38,19 +43,29 @@ export default [
     route("enquiries", "routes/admin/enquiries.tsx"),
     route("enquiries/:id", "routes/admin/enquiry.tsx"),
     route("clients", "routes/admin/clients.tsx"),
+    route("clients/:id", "routes/admin/client.tsx"),
     route("engagements", "routes/admin/engagements.tsx"),
-    route("projects", "routes/admin/projects.tsx"),
-    route("projects/:id", "routes/admin/project.tsx"),
-    route("services", "routes/admin/services.tsx"),
-    route("services/:id", "routes/admin/service.tsx"),
+    route("engagements/:id", "routes/admin/engagement.tsx"),
+    route("projects", "routes/admin/content-list.tsx", { id: "admin-projects" }),
+    route("projects/:id", "routes/admin/content-item.tsx", { id: "admin-project" }),
+    route("services", "routes/admin/content-list.tsx", { id: "admin-services" }),
+    route("services/:id", "routes/admin/content-item.tsx", { id: "admin-service" }),
+    route("partners", "routes/admin/content-list.tsx", { id: "admin-partners" }),
+    route("partners/:id", "routes/admin/content-item.tsx", { id: "admin-partner" }),
+    route("careers", "routes/admin/content-list.tsx", { id: "admin-careers" }),
+    route("careers/:id", "routes/admin/content-item.tsx", { id: "admin-career" }),
     route("content", "routes/admin/content.tsx"),
+    route("content/pages/:id", "routes/admin/content-item.tsx", { id: "admin-page" }),
     route("settings", "routes/admin/settings.tsx"),
     route("security", "routes/admin/security.tsx"),
     route("audit", "routes/admin/audit.tsx"),
     route("users", "routes/admin/users.tsx"),
     route("system", "routes/admin/system.tsx"),
   ]),
-  route("client", "routes/client/_layout.tsx", [index("routes/client/index.tsx")]),
+  route("client", "routes/client/_layout.tsx", [
+    index("routes/client/index.tsx"),
+    route("projects/:id", "routes/client/project.tsx"),
+  ]),
   route("member", "routes/member/_layout.tsx", [index("routes/member/index.tsx")]),
   route("sitemap.xml", "routes/system/sitemap.ts"),
   route("robots.txt", "routes/system/robots.ts"),

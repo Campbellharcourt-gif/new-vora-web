@@ -129,3 +129,19 @@ export async function setFeatureFlag(
     },
   });
 }
+
+/** Every known flag with its stored state (or code default) — for the admin Settings page. */
+export async function listFlagStates(ctx: ServerContext, actorInput: Actor | null) {
+  await authorize(ctx, actorInput, "settings.view");
+  const rows = await loadFlags(ctx);
+  return (Object.keys(FLAGS) as FlagKey[]).map((key) => {
+    const row = rows.get(key);
+    return {
+      key,
+      description: FLAGS[key].description,
+      enabled: row ? row.enabled : FLAGS[key].default,
+      narrowed: Boolean(row?.rules?.roles?.length || row?.rules?.environments?.length),
+      isDefault: !row,
+    };
+  });
+}

@@ -48,8 +48,6 @@ export function SiteFooter({
           </div>
           <div className="v-footer__col v-footer__col--wide">
             <p className="v-label">Legal &amp; system</p>
-            <Link to="/privacy">Privacy</Link>
-            <Link to="/terms">Terms</Link>
             <Link to="/cookies">Cookies</Link>
             <Link to="/status">Status</Link>
             <Link to={chrome.signedIn ? chrome.accountHref : "/login"}>
@@ -59,6 +57,11 @@ export function SiteFooter({
         </div>
         <div className="v-footer__base">
           <p className="v-label">© {year} VORA</p>
+          <nav className="v-footer__legal" aria-label="Legal">
+            <Link to="/terms">Terms &amp; Conditions</Link>
+            <span aria-hidden="true">·</span>
+            <Link to="/privacy">Privacy Policy</Link>
+          </nav>
         </div>
       </div>
     </footer>

@@ -13,13 +13,23 @@ import type { Route } from "./+types/_layout";
 
 export async function loader({ context }: Route.LoaderArgs) {
   const { server, actor } = load(context);
-  const [socials, emails, identity, assistant] = await Promise.all([
+  const [socials, emails, identity, assistant, announcement] = await Promise.all([
     listVisibleSocialLinks(server, "footer"),
     getSetting(server, "contact.emails"),
     getSetting(server, "site.identity"),
     publicAssistantAvailability(server, actor),
+    getSetting(server, "site.announcement"),
   ]);
   return {
+    announcement: announcement.enabled
+      ? {
+          message: announcement.message,
+          link:
+            announcement.linkHref && announcement.linkLabel
+              ? { href: announcement.linkHref, label: announcement.linkLabel }
+              : null,
+        }
+      : null,
     assistant,
     socials: socials.map((s) => ({ url: s.url, label: s.label })),
     emails: { general: emails.general, projects: emails.projects },
@@ -76,6 +86,14 @@ export default function PublicLayout({ loaderData }: Route.ComponentProps) {
       <a className="skip-link" href="#main" tabIndex={0}>
         Skip to content
       </a>
+      {loaderData.announcement ? (
+        <aside className="v-announce" aria-label="Announcement">
+          <p>{loaderData.announcement.message}</p>
+          {loaderData.announcement.link ? (
+            <a href={loaderData.announcement.link.href}>{loaderData.announcement.link.label}</a>
+          ) : null}
+        </aside>
+      ) : null}
       <SiteHeader chrome={chrome} pageTheme={theme} reading={reading} />
       <main id="main" className="v-main" data-theme={theme === "mist" ? "mist" : undefined}>
         <Outlet />

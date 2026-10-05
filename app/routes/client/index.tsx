@@ -1,6 +1,7 @@
+import { Link } from "react-router";
 import { load, requirePermission } from "~/.server/guards";
 import { listClientEngagements } from "~/.server/services/client-portal";
-import { StatusIndicator } from "~/components/vora/primitives";
+import { EngagementStatusTag } from "~/components/workspace/status";
 import {
   EmptyState,
   PageHeading,
@@ -17,23 +18,23 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 export default function ClientHome({ loaderData }: Route.ComponentProps) {
   return (
     <>
-      <PageHeading eyebrow="Client portal" title="Your engagements" />
+      <PageHeading eyebrow="Client portal" title="Your projects" />
       <WelcomeNotice>
         Welcome to VORA. Your projects appear here once your VORA contact links your account to your
         organisation.
       </WelcomeNotice>
       {loaderData.engagements.length === 0 ? (
         <EmptyState>
-          There are no engagements shared with you yet. Your VORA contact will add them here.
+          There are no projects shared with you yet. Your VORA contact will add them here.
         </EmptyState>
       ) : (
-        <Panel title="Engagements" flush>
+        <Panel title="Projects" flush>
           <div className="v-tablewrap">
             <table className="v-table v-table--stack">
-              <caption className="v-sr">Your engagements</caption>
+              <caption className="v-sr">Your projects</caption>
               <thead>
                 <tr>
-                  <th scope="col">Engagement</th>
+                  <th scope="col">Project</th>
                   <th scope="col">Organisation</th>
                   <th scope="col">Status</th>
                 </tr>
@@ -41,10 +42,12 @@ export default function ClientHome({ loaderData }: Route.ComponentProps) {
               <tbody>
                 {loaderData.engagements.map((e) => (
                   <tr key={e.id}>
-                    <td>{e.name}</td>
+                    <td>
+                      <Link to={`/client/projects/${e.id}`}>{e.name}</Link>
+                    </td>
                     <td data-label="Organisation">{e.orgName}</td>
                     <td data-label="Status">
-                      <StatusIndicator kind="info">{e.status.replace("_", " ")}</StatusIndicator>
+                      <EngagementStatusTag status={e.status} />
                     </td>
                   </tr>
                 ))}

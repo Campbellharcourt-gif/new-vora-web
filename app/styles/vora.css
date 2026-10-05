@@ -878,8 +878,43 @@
     padding-top: var(--space-4);
     border-top: 1px solid var(--color-line);
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
+    align-items: baseline;
     gap: var(--space-4);
+  }
+  .v-footer__legal {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-2);
+    font-size: var(--type-body-s);
+  }
+  .v-footer__legal a {
+    color: var(--color-text-secondary);
+    text-underline-offset: 0.2em;
+  }
+  .v-footer__legal a:hover,
+  .v-footer__legal a:focus-visible {
+    color: var(--color-text);
+  }
+  /* A one-line notice above the header (Content › Announcement). Scrolls away; the header stays sticky. */
+  .v-announce {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-2) var(--space-4);
+    padding: var(--space-2) var(--page-margin);
+    background: var(--color-text);
+    color: var(--color-bg);
+    font-size: var(--type-body-s);
+    line-height: 1.5;
+    text-align: center;
+  }
+  .v-announce a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
   }
   @media (min-width: 768px) {
     .v-footer__grid {
@@ -2660,6 +2695,122 @@
     gap: var(--space-4);
     align-items: center;
     justify-content: space-between;
+  }
+  @media (min-width: 768px) {
+    .v-panels--three {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 1200px) {
+    .v-panels--three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  /* Dashboard figures: a hairline-ruled row of label + number (no cards, no shadows). */
+  .v-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    margin: 0;
+    border-top: 1px solid var(--color-line);
+    border-left: 1px solid var(--color-line);
+  }
+  .v-stats > div {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-4) var(--space-5);
+    border-right: 1px solid var(--color-line);
+    border-bottom: 1px solid var(--color-line);
+    background: var(--color-surface, var(--color-bg));
+  }
+  .v-stats dt {
+    font-family: var(--font-mono);
+    font-size: var(--type-label);
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+  }
+  .v-stats dd {
+    margin: 0;
+    font-size: var(--type-heading-m, 1.75rem);
+    line-height: 1.1;
+  }
+  .v-stats dd a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .v-stats dd a:hover,
+  .v-stats dd a:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+  /* Hairline rows for short lists inside panels (people, files, notifications). */
+  .v-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .v-list > li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-4);
+    padding: var(--space-3) var(--space-5);
+    border-top: 1px solid var(--color-line);
+    font-size: var(--type-body-s);
+    min-width: 0;
+  }
+  .v-list > li > :first-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .v-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .v-disclosure {
+    border-top: 1px solid var(--color-line);
+    padding-top: var(--space-3);
+    margin-top: var(--space-4);
+  }
+  .v-disclosure > summary {
+    cursor: pointer;
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    overflow-wrap: anywhere;
+  }
+  .v-disclosure[open] > summary {
+    margin-bottom: var(--space-3);
+  }
+  .v-fieldset-plain {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+    display: grid;
+    gap: inherit;
+  }
+  .v-versions {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 28rem;
+    overflow-y: auto;
+  }
+  .v-versions > li {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-5);
+    border-top: 1px solid var(--color-line);
+  }
+  .v-versions > li:first-child {
+    border-top: 0;
   }
   .v-skeleton {
     background: var(--color-well);

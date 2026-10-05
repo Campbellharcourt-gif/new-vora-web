@@ -17,7 +17,7 @@ export default function ClientLayout({ loaderData }: Route.ComponentProps) {
     <WorkspaceShell
       area="Client portal"
       user={loaderData.user}
-      nav={[{ to: "/client", label: "Engagements", end: true }]}
+      nav={[{ to: "/client", label: "Projects", end: true }]}
       switchTo={[{ to: "/account/security", label: "Your account" }]}
     >
       <Outlet />
