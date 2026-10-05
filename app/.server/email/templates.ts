@@ -143,6 +143,45 @@ export const templates = {
     return { subject: "Your invitation to VORA", html, text };
   },
 
+  verifyEmail(
+    t: TemplateContext,
+    d: { name: string; accountLabel: string; url: string; hours: number },
+  ): RenderedEmail {
+    const body = [
+      `Hi ${d.name},`,
+      `Thanks for creating a VORA ${d.accountLabel} account. Confirm this email address and choose your password to finish.`,
+    ];
+    const { html, text } = layout({
+      ...t,
+      preheader: "Confirm your email to finish creating your VORA account",
+      heading: "Confirm your email",
+      bodyHtml: body.map(p).join(""),
+      bodyText: body.join("\n\n"),
+      action: { label: "Confirm and set a password", url: d.url },
+      footnote: `The link expires in ${d.hours} hours and works once. If you didn't try to create a VORA account, you can ignore this email — no account is created until the link is used.`,
+    });
+    return { subject: "Confirm your email for VORA", html, text };
+  },
+
+  accountExists(t: TemplateContext, d: { name: string; signInUrl: string }): RenderedEmail {
+    const body = [
+      `Hi ${d.name},`,
+      "Someone tried to create a new VORA account with this email address. You already have an account, so nothing was changed.",
+      "If that was you, sign in instead — or reset your password from the sign-in page if you've forgotten it.",
+    ];
+    const { html, text } = layout({
+      ...t,
+      preheader: "You already have a VORA account",
+      heading: "You already have an account",
+      bodyHtml: body.map(p).join(""),
+      bodyText: body.join("\n\n"),
+      action: { label: "Sign in", url: d.signInUrl },
+      footnote:
+        "If this wasn't you, you can ignore this email. Your account and password are unchanged.",
+    });
+    return { subject: "You already have a VORA account", html, text };
+  },
+
   newSignIn(
     t: TemplateContext,
     d: { name: string; when: string; device: string; location: string; url: string },

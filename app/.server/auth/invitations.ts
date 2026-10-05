@@ -9,6 +9,7 @@ import { DAY } from "../lib/time";
 import { writeAudit } from "../observability/audit";
 import { recordSecurityEvent } from "../observability/security-events";
 import { isFlagEnabled } from "../services/flags";
+import { notifyPermissionHolders } from "../services/notifications";
 import { generateRecoveryCodes } from "./mfa";
 import { breachCount, checkPasswordPolicy } from "./password";
 import { passwordHashing } from "./password-hashing";
@@ -128,7 +129,13 @@ async function findInvitation(ctx: ServerContext, token: string) {
 export async function getInvitationPreview(ctx: ServerContext, token: string) {
   const invitation = await findInvitation(ctx, token);
   if (!invitation) return null;
-  return { email: invitation.email, name: invitation.name, roleKeys: invitation.roleKeys };
+  return {
+    email: invitation.email,
+    name: invitation.name,
+    roleKeys: invitation.roleKeys,
+    /** A public registration (no inviter) rather than an invitation sent by VORA. */
+    selfRegistration: invitation.invitedBy === null,
+  };
 }
 
 export interface AcceptedInvitation {
@@ -145,9 +152,19 @@ export async function acceptInvitation(
   ctx: ServerContext,
   token: string,
   input: { name: string; password: string },
+  options: { selfRegistration?: boolean } = {},
 ): Promise<AcceptedInvitation> {
   const invitation = await findInvitation(ctx, token);
   if (!invitation) throw errors.validation({ _form: "This invitation is invalid or has expired." });
+  // `/verify-email` completes public registrations only; it never accepts a staff invitation.
+  if (
+    options.selfRegistration &&
+    (invitation.invitedBy !== null ||
+      invitation.roleKeys.length !== 1 ||
+      !["client", "member"].includes(invitation.roleKeys[0] ?? ""))
+  ) {
+    throw errors.validation({ _form: "This link is invalid or has expired." });
+  }
 
   const problem = checkPasswordPolicy(input.password, {
     email: invitation.email,
@@ -232,16 +249,34 @@ export async function acceptInvitation(
     privileged: access.privileged,
     mfaVerified: true,
   });
+  const selfRegistered = invitation.invitedBy === null;
   await writeAudit(
     ctx,
     { userId, roles: access.roles },
-    {
-      action: "user.invitation.accept",
-      targetType: "user",
-      targetId: userId,
-      summary: "Accepted invitation and created account",
-      changes: { roles: access.roles },
-    },
+    selfRegistered
+      ? {
+          action: "user.register",
+          targetType: "user",
+          targetId: userId,
+          summary: `Registered a ${access.roles.join(", ")} account`,
+          changes: { roles: access.roles },
+        }
+      : {
+          action: "user.invitation.accept",
+          targetType: "user",
+          targetId: userId,
+          summary: "Accepted invitation and created account",
+          changes: { roles: access.roles },
+        },
   );
+  if (selfRegistered && access.roles.includes("client")) {
+    // A new client account sees no projects until VORA links it to an organisation.
+    await notifyPermissionHolders(ctx, "clients.manage", {
+      type: "client.registered",
+      title: `New client account: ${input.name}`,
+      body: "Link the account to a client organisation so they can see their projects.",
+      link: `/admin/users/${userId}`,
+    });
+  }
   return { session, recoveryCodes, userId };
 }

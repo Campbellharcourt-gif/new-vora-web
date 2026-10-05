@@ -27,21 +27,21 @@ describe("feature flags", () => {
   it("falls back to code defaults, then honours stored overrides and rules", async () => {
     resetCaches();
     const ctx = makeCtx();
-    expect(await isFlagEnabled(ctx, "members.self_signup")).toBe(false);
+    expect(await isFlagEnabled(ctx, "ai.public_assistant")).toBe(false);
     expect(await isFlagEnabled(ctx, "auth.breach_check")).toBe(true);
 
     const owner = await actorFor((await createUser({ roles: ["owner"] })).id);
     const admin = await actorFor((await createUser({ roles: ["admin"] })).id);
     const staff = await actorFor((await createUser({ roles: ["staff"] })).id);
 
-    await setFeatureFlag(ctx, owner, "members.self_signup", { enabled: true });
-    expect(await isFlagEnabled(ctx, "members.self_signup")).toBe(true);
+    await setFeatureFlag(ctx, owner, "ai.public_assistant", { enabled: true });
+    expect(await isFlagEnabled(ctx, "ai.public_assistant")).toBe(true);
 
-    await setFeatureFlag(ctx, owner, "members.self_signup", {
+    await setFeatureFlag(ctx, owner, "ai.public_assistant", {
       enabled: true,
       rules: { environments: ["production"] },
     });
-    expect(await isFlagEnabled(ctx, "members.self_signup")).toBe(false); // tests run as "test"
+    expect(await isFlagEnabled(ctx, "ai.public_assistant")).toBe(false); // tests run as "test"
 
     await setFeatureFlag(ctx, owner, "ai.admin_tools", {
       enabled: true,
@@ -70,7 +70,7 @@ describe("feature flags", () => {
     const ctx = makeCtx();
     const manager = await actorFor((await createUser({ roles: ["manager"] })).id);
     expect(
-      (await appError(setFeatureFlag(ctx, manager, "members.self_signup", { enabled: true }))).code,
+      (await appError(setFeatureFlag(ctx, manager, "ai.public_assistant", { enabled: true }))).code,
     ).toBe("forbidden");
     const admin = await actorFor((await createUser({ roles: ["admin"] })).id);
     expect((await appError(setFeatureFlag(ctx, admin, "made.up", { enabled: true }))).code).toBe(
@@ -85,7 +85,7 @@ describe("feature flags", () => {
       expect(
         (
           await appError(
-            setFeatureFlag(ctx, admin, "members.self_signup", { enabled: true, rules }),
+            setFeatureFlag(ctx, admin, "ai.public_assistant", { enabled: true, rules }),
           )
         ).code,
         JSON.stringify(rules),

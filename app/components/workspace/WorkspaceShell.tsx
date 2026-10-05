@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { Form, Link, NavLink, useLocation } from "react-router";
+import { Form, Link, NavLink, useLocation, useSearchParams } from "react-router";
 import { Logo } from "~/components/ui/Logo";
 
 export interface WorkspaceNavItem {
@@ -215,4 +215,16 @@ export function formatDateTime(ms: number | null | undefined): string {
     timeZone: "UTC",
   }).format(ms);
   return `${formatted} UTC`;
+}
+
+/** Shown once after a self-registered account is created (`?welcome=1` on the first landing). */
+export function WelcomeNotice({ children }: { children: ReactNode }) {
+  const [params] = useSearchParams();
+  if (params.get("welcome") !== "1") return null;
+  return (
+    <div className="v-notice" role="status">
+      <span className="v-status v-status--success">Account created</span>
+      <div>{children}</div>
+    </div>
+  );
 }

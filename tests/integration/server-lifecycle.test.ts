@@ -225,7 +225,7 @@ describe("graceful shutdown (SIGTERM) and restart", () => {
     ).toBe(1);
     expect(
       await second.server.env.DB.prepare("SELECT count(*) AS n FROM d1_migrations").first("n"),
-    ).toBe(3);
+    ).toBe(readdirSync("migrations").filter((f) => f.endsWith(".sql")).length);
     expect(existsSync(path)).toBe(true);
   });
 });

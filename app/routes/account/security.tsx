@@ -7,6 +7,7 @@ import {
   regenerateRecoveryCodes,
   revokeOtherSessions,
   revokeOwnSession,
+  setTwoStep,
 } from "~/.server/auth/account";
 import { failureFrom, formString, load, requireActor } from "~/.server/guards";
 import { describeUserAgent } from "~/.server/lib/request-meta";
@@ -109,6 +110,18 @@ export async function action({ context, request }: Route.ActionArgs) {
       case "regenerate-codes": {
         const codes = await regenerateRecoveryCodes(server, actor);
         return { ok: true, intent, codes } satisfies ActionResult;
+      }
+      case "two-step": {
+        const enabled = formString(form, "enabled") === "on";
+        const { recoveryCodes } = await setTwoStep(server, actor, enabled);
+        return {
+          ok: true,
+          intent,
+          message: enabled
+            ? "Two-step verification is on. We'll email you a code each time you sign in."
+            : "Two-step verification is off.",
+          ...(recoveryCodes ? { codes: recoveryCodes } : {}),
+        } satisfies ActionResult;
       }
       default:
         return data(
@@ -220,6 +233,37 @@ export default function Security({ loaderData }: Route.ComponentProps) {
         </div>
       </Panel>
 
+      <Panel title="Two-step verification">
+        {loaderData.privileged ? (
+          <p className="v-body-s">
+            On — required for your role. We email you a code every time you sign in.
+          </p>
+        ) : (
+          <>
+            <p className="v-body-s">
+              {loaderData.twoStep
+                ? "On. We email you a code every time you sign in."
+                : "Off. Turn it on to be asked for a code, sent to your email, every time you sign in."}
+            </p>
+            {loaderData.elevated ? (
+              <Form method="post">
+                <input type="hidden" name="intent" value="two-step" />
+                <input type="hidden" name="enabled" value={loaderData.twoStep ? "off" : "on"} />
+                <Button variant="secondary" size="s" busy={busy}>
+                  {loaderData.twoStep
+                    ? "Turn off two-step verification"
+                    : "Turn on two-step verification"}
+                </Button>
+              </Form>
+            ) : (
+              <p className="v-body-s v-secondary">
+                Confirm your password under Recovery codes to change this.
+              </p>
+            )}
+          </>
+        )}
+      </Panel>
+
       <div className="v-panels v-panels--two">
         <Panel title="Change password">
           <Form method="post" className="v-form v-form--tight">
@@ -279,7 +323,7 @@ export default function Security({ loaderData }: Route.ComponentProps) {
                   <input type="hidden" name="intent" value="elevate" />
                   <TextField
                     name="password"
-                    label="Confirm your password to manage recovery codes"
+                    label="Confirm your password to manage recovery codes and two-step verification"
                     type="password"
                     autoComplete="current-password"
                     required

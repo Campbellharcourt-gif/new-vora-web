@@ -29,6 +29,11 @@ export type SecurityEventType =
   | "ai.abuse"
   | "config.invalid"
   | "roles.changed"
+  | "roles.definition.changed"
+  | "auth.two_step.enabled"
+  | "auth.two_step.disabled"
+  | "auth.sessions.revoked_by_admin"
+  | "privacy.account_deleted"
   | "maintenance.changed";
 
 export interface SecurityEventInput {

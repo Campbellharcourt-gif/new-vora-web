@@ -1,7 +1,12 @@
 import { load, requirePermission } from "~/.server/guards";
 import { listClientEngagements } from "~/.server/services/client-portal";
 import { StatusIndicator } from "~/components/vora/primitives";
-import { EmptyState, PageHeading, Panel } from "~/components/workspace/WorkspaceShell";
+import {
+  EmptyState,
+  PageHeading,
+  Panel,
+  WelcomeNotice,
+} from "~/components/workspace/WorkspaceShell";
 import type { Route } from "./+types/index";
 
 export async function loader({ context, request }: Route.LoaderArgs) {
@@ -13,6 +18,10 @@ export default function ClientHome({ loaderData }: Route.ComponentProps) {
   return (
     <>
       <PageHeading eyebrow="Client portal" title="Your engagements" />
+      <WelcomeNotice>
+        Welcome to VORA. Your projects appear here once your VORA contact links your account to your
+        organisation.
+      </WelcomeNotice>
       {loaderData.engagements.length === 0 ? (
         <EmptyState>
           There are no engagements shared with you yet. Your VORA contact will add them here.

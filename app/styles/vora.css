@@ -1777,6 +1777,18 @@
     align-items: flex-start;
     min-height: 44px;
   }
+  /* An option with a description (e.g. Client / Member at registration). */
+  .v-choice:has(.v-choice__text) {
+    align-items: flex-start;
+    padding-block: var(--space-3);
+  }
+  .v-choice:has(.v-choice__text) input {
+    margin-top: 2px;
+  }
+  .v-choice__text {
+    display: grid;
+    gap: var(--space-1);
+  }
   .v-choice--plain input {
     margin-top: 2px;
   }
@@ -2952,5 +2964,15 @@
   }
   .v-auth__links a:hover {
     color: var(--color-text);
+  }
+  /* The secondary path under Sign in ("New to VORA? Create an account"). */
+  .v-auth__alt {
+    display: grid;
+    gap: var(--space-2);
+    padding-top: var(--space-5);
+    border-top: 1px solid var(--color-line);
+  }
+  .v-auth__alt .v-btn {
+    margin-top: var(--space-2);
   }
 }

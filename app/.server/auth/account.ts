@@ -25,12 +25,15 @@ async function loadSelf(ctx: ServerContext, actor: Actor) {
 }
 
 export async function getSecurityOverview(ctx: ServerContext, actor: Actor) {
-  const [sessions, history, recoveryRemaining] = await Promise.all([
+  const [sessions, history, recoveryRemaining, user] = await Promise.all([
     listActiveSessions(ctx, actor.userId),
     recentLoginHistory(ctx, actor.userId, 20),
     remainingRecoveryCodes(ctx, actor.userId),
+    loadSelf(ctx, actor),
   ]);
   return {
+    /** Email codes at every sign-in: mandatory for privileged roles, optional for everyone else. */
+    twoStep: actor.privileged || user.mfaEnforced,
     sessions: sessions
       .map((s) => ({ ...s, current: s.id === actor.session.id }))
       .sort((a, b) => b.lastSeenAt - a.lastSeenAt),
@@ -135,6 +138,54 @@ export async function regenerateRecoveryCodes(ctx: ServerContext, actor: Actor):
     "A new set of recovery codes was created for your VORA account. Your previous codes no longer work.",
   );
   return codes;
+}
+
+/**
+ * Turns email two-step verification on or off for a non-privileged account (privileged roles
+ * always use it). Needs a recent password confirmation. Turning it on issues recovery codes if the
+ * account has none, so losing access to the mailbox never locks the person out.
+ */
+export async function setTwoStep(
+  ctx: ServerContext,
+  actor: Actor,
+  enabled: boolean,
+): Promise<{ recoveryCodes: string[] | null }> {
+  requireElevated(ctx, actor);
+  if (actor.privileged) {
+    throw errors.conflict("Two-step verification is required for your role.");
+  }
+  const user = await loadSelf(ctx, actor);
+  if (user.mfaEnforced === enabled) return { recoveryCodes: null };
+  const now = ctx.clock.now();
+  await ctx.db
+    .update(schema.users)
+    .set({ mfaEnforced: enabled, updatedAt: now })
+    .where(eq(schema.users.id, actor.userId));
+  let recoveryCodes: string[] | null = null;
+  if (enabled && (await remainingRecoveryCodes(ctx, actor.userId)) === 0) {
+    recoveryCodes = await generateRecoveryCodes(ctx, actor.userId);
+  }
+  await recordSecurityEvent(ctx, {
+    type: enabled ? "auth.two_step.enabled" : "auth.two_step.disabled",
+    severity: enabled ? "info" : "low",
+    userId: actor.userId,
+  });
+  await writeAudit(ctx, actor, {
+    action: enabled ? "user.two_step.enable" : "user.two_step.disable",
+    targetType: "user",
+    targetId: actor.userId,
+    summary: enabled ? "Turned on two-step verification" : "Turned off two-step verification",
+    changes: { mfaEnforced: { from: user.mfaEnforced, to: enabled } },
+  });
+  await sendSecurityNotice(
+    ctx,
+    user,
+    enabled ? "Two-step verification turned on" : "Two-step verification turned off",
+    enabled
+      ? "Your VORA account now asks for a code sent to this email address every time you sign in."
+      : "Your VORA account no longer asks for an emailed code when you sign in.",
+  );
+  return { recoveryCodes };
 }
 
 /** Revokes one of the actor's OWN sessions. Other users' sessions are managed via security.manage. */

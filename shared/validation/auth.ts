@@ -45,3 +45,15 @@ export const setPasswordSchema = z
   });
 
 export const forgotPasswordSchema = z.object({ email: emailAddress });
+
+/** Account types a visitor may choose. Owner, Admin and Staff are invitation-only. */
+export const SELF_SIGNUP_ACCOUNT_TYPES = ["client", "member"] as const;
+export type SelfSignupAccountType = (typeof SELF_SIGNUP_ACCOUNT_TYPES)[number];
+
+/** Step 1 of registration: who you are. The password is chosen after the email is confirmed. */
+export const registrationSchema = z.object({
+  accountType: z.enum(SELF_SIGNUP_ACCOUNT_TYPES, { error: "Choose Client or Member." }),
+  name: personNameSchema,
+  email: emailAddress,
+  consent: z.literal("on", { error: "Please confirm you've read the Privacy Policy." }),
+});

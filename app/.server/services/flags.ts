@@ -10,7 +10,11 @@ import { writeAudit } from "../observability/audit";
 
 /** Known feature flags and their defaults. Unknown keys are always off. */
 export const FLAGS = {
-  "members.self_signup": { default: false, description: "Allow public member registration" },
+  "accounts.self_signup": {
+    default: true,
+    description:
+      "Allow public Client and Member registration (Owner, Admin and Staff are invite-only)",
+  },
   "ai.public_assistant": { default: false, description: "Show the public Ask VORA assistant" },
   "ai.admin_tools": { default: false, description: "Enable VORA AI tools in admin" },
   "auth.breach_check": {

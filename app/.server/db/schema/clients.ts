@@ -10,7 +10,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import { inList, isJson } from "./_helpers";
-import { projects } from "./content";
+import { projects, services } from "./content";
 import { users } from "./identity";
 import { mediaAssets } from "./media";
 
@@ -101,6 +101,24 @@ export const engagementStaff = sqliteTable(
   (t) => [
     primaryKey({ columns: [t.engagementId, t.userId] }),
     index("engagement_staff_user_idx").on(t.userId),
+  ],
+);
+
+/** The VORA services an engagement covers (Websites, Branding, …) — admin "Manage services". */
+export const engagementServices = sqliteTable(
+  "engagement_services",
+  {
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    serviceId: text("service_id")
+      .notNull()
+      .references(() => services.id, { onDelete: "cascade" }),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.engagementId, t.serviceId] }),
+    index("engagement_services_service_idx").on(t.serviceId),
   ],
 );
 

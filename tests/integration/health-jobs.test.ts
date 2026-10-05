@@ -1,4 +1,5 @@
 import { createExecutionContext, waitOnExecutionContext } from "cloudflare:test";
+import { readdirSync } from "node:fs";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { createSession } from "~/.server/auth/sessions";
@@ -68,7 +69,11 @@ describe("health endpoints", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as Status;
     const byName = Object.fromEntries(body.components.map((c) => [c.name, c]));
-    expect(byName.database).toMatchObject({ state: "operational", detail: "3 migrations applied" });
+    const migrationCount = readdirSync("migrations").filter((f) => f.endsWith(".sql")).length;
+    expect(byName.database).toMatchObject({
+      state: "operational",
+      detail: `${migrationCount} migrations applied`,
+    });
     expect(byName.storage?.state).toBe("operational");
     expect(byName.ai).toMatchObject({ state: "not_configured" });
     expect(byName.configuration?.state).toBe("degraded");

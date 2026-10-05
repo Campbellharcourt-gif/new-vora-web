@@ -180,7 +180,7 @@ describe("atomic batches (the D1 batch guarantee)", () => {
 });
 
 describe("migrations at start-up (§6.5)", () => {
-  it("a fresh file gets all three; a second start applies none", async () => {
+  it("a fresh file gets every migration; a second start applies none", async () => {
     const path = fileDb();
     const db = await openDatabase({ path });
     const first = await migrate(db, MIGRATIONS);
@@ -188,6 +188,7 @@ describe("migrations at start-up (§6.5)", () => {
       "0000_initial_schema.sql",
       "0001_integrity_triggers.sql",
       "0002_owner_guards.sql",
+      "0003_engagement_services.sql",
     ]);
     expect(first.snapshot).toBeNull(); // nothing to protect in an empty database
     expect((await migrate(db, MIGRATIONS)).applied).toEqual([]);
@@ -202,7 +203,7 @@ describe("migrations at start-up (§6.5)", () => {
     const dir = join(work, "failing-migrations");
     cpSync(resolve("migrations"), dir, { recursive: true });
     writeFileSync(
-      join(dir, "0003_broken.sql"),
+      join(dir, "0099_broken.sql"),
       "CREATE TABLE half_done (id integer);\n--> statement-breakpoint\nINSERT INTO no_such_table VALUES (1);\n",
     );
     const path = fileDb();
@@ -215,7 +216,7 @@ describe("migrations at start-up (§6.5)", () => {
       (e: unknown) => e,
     );
     expect(error).toBeInstanceOf(MigrationError);
-    expect((error as MigrationError).migration).toBe("0003_broken.sql");
+    expect((error as MigrationError).migration).toBe("0099_broken.sql");
     const snapshot = (error as MigrationError).snapshot as string;
     expect(existsSync(snapshot)).toBe(true);
     expect(
@@ -223,7 +224,9 @@ describe("migrations at start-up (§6.5)", () => {
         .prepare("SELECT count(*) AS n FROM sqlite_master WHERE name = 'half_done'")
         .first("n"),
     ).toBe(0);
-    expect(await db.prepare("SELECT count(*) AS n FROM d1_migrations").first("n")).toBe(3);
+    expect(await db.prepare("SELECT count(*) AS n FROM d1_migrations").first("n")).toBe(
+      MIGRATIONS.length,
+    );
     // The snapshot is the pre-migration database, usable as it is.
     const restored = await openDatabase({ path: snapshot });
     expect(

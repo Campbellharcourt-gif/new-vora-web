@@ -31,6 +31,8 @@ export default [
     route("reset-password/:token", "routes/auth/reset-password.tsx"),
     route("invite/:token", "routes/auth/invite.tsx"),
     route("setup", "routes/auth/setup.tsx"),
+    route("register", "routes/auth/register.tsx"),
+    route("verify-email/:token", "routes/auth/verify-email.tsx"),
   ]),
   route("logout", "routes/auth/logout.tsx"),
 

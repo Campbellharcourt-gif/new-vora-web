@@ -220,7 +220,8 @@ export function Select(
 export function ChoiceGroup(
   props: BaseFieldProps & {
     type: "checkbox" | "radio";
-    options: readonly { key: string; label: string }[];
+    /** `description` is shown under the option and announced with it (aria-describedby). */
+    options: readonly { key: string; label: string; description?: string }[];
     defaultValues?: readonly string[];
   },
 ) {
@@ -249,20 +250,33 @@ export function ChoiceGroup(
       </legend>
       <Hint id={id} hint={hint} />
       <div className="v-choices">
-        {options.map((o, i) => (
-          <label key={o.key} className="v-choice">
-            <input
-              id={i === 0 ? id : `${id}-${i}`}
-              type={type}
-              name={name}
-              value={o.key}
-              defaultChecked={defaultValues.includes(o.key)}
-              required={type === "radio" ? required : undefined}
-              aria-invalid={error ? true : undefined}
-            />
-            <span>{o.label}</span>
-          </label>
-        ))}
+        {options.map((o, i) => {
+          const optionId = i === 0 ? id : `${id}-${i}`;
+          return (
+            <label key={o.key} className="v-choice">
+              <input
+                id={optionId}
+                type={type}
+                name={name}
+                value={o.key}
+                defaultChecked={defaultValues.includes(o.key)}
+                required={type === "radio" ? required : undefined}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={o.description ? `${optionId}-desc` : undefined}
+              />
+              {o.description ? (
+                <span className="v-choice__text">
+                  <span>{o.label}</span>
+                  <span id={`${optionId}-desc`} className="v-body-s v-secondary">
+                    {o.description}
+                  </span>
+                </span>
+              ) : (
+                <span>{o.label}</span>
+              )}
+            </label>
+          );
+        })}
       </div>
       <FieldError id={id} error={error} />
     </fieldset>

@@ -28,7 +28,7 @@
  */
 import { type ChildProcess, execFileSync, spawn, spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, openSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, openSync, readdirSync, rmSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { LOCAL_DEFAULTS, readVarsFile } from "../server/local-env";
 import { applyBaseSeed } from "../server/ops";
@@ -298,7 +298,7 @@ async function compare(
     );
     check(
       `${label}: every migration recorded as applied`,
-      migrations.length === 3,
+      migrations.length === readdirSync("migrations").filter((f) => f.endsWith(".sql")).length,
       migrations.join(", "),
     );
     const integrity = await integrityCheck(db);

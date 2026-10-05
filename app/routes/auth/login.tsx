@@ -11,6 +11,7 @@ import {
   useSearchParams,
 } from "react-router";
 import { homePathFor, type LoginResult, signIn } from "~/.server/auth/login";
+import { isRegistrationOpen } from "~/.server/auth/registration";
 import { formString, load, safeNext } from "~/.server/guards";
 import { isAppError } from "~/.server/lib/errors";
 import { Button, ErrorSummary, Notice, TextField } from "~/components/ui/forms";
@@ -27,6 +28,7 @@ export async function loader({ context, request }: Route.LoaderArgs) {
     );
   return {
     turnstileSiteKey: server.config.turnstile.secretKey ? server.config.turnstile.siteKey : null,
+    registrationOpen: await isRegistrationOpen(server),
   };
 }
 
@@ -161,6 +163,19 @@ export default function Login({ loaderData }: Route.ComponentProps) {
       <p className="v-auth__links">
         <Link to="/forgot-password">Forgot your password?</Link>
       </p>
+      {loaderData.registrationOpen ? (
+        <section className="v-auth__alt" aria-labelledby="login-new">
+          <h2 id="login-new" className="v-heading-s">
+            New to VORA?
+          </h2>
+          <p className="v-body-s v-secondary">Create an account as a Client or Member.</p>
+          <p>
+            <Link className="v-btn v-btn--secondary" to="/register">
+              Create an account
+            </Link>
+          </p>
+        </section>
+      ) : null}
     </div>
   );
 }

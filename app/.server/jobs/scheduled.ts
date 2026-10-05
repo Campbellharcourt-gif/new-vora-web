@@ -7,6 +7,7 @@ import { deliverDue } from "../email/outbox";
 import { newId } from "../lib/ids";
 import { DAY } from "../lib/time";
 import { describeError } from "../observability/logger";
+import { pruneNotifications } from "../services/notifications";
 import { getSetting } from "../services/settings";
 
 /** Runs one job with a `job_runs` record; a failing job is recorded and logged, never thrown. */
@@ -125,6 +126,7 @@ export async function dailyJob(ctx: ServerContext): Promise<void> {
       .delete(schema.jobRuns)
       .where(lt(schema.jobRuns.startedAt, now - 30 * DAY))
       .run();
+    const notificationsDeleted = await pruneNotifications(ctx);
 
     return {
       rbacSynced,
@@ -137,6 +139,7 @@ export async function dailyJob(ctx: ServerContext): Promise<void> {
       aiConversationsDeleted: affectedRows(conversations),
       enquiriesAnonymised: affectedRows(enquiries),
       jobRunsDeleted: affectedRows(jobs),
+      notificationsDeleted,
     };
   });
 }
