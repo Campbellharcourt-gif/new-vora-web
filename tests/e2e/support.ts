@@ -4,9 +4,17 @@ import { type APIRequestContext, expect, type Page } from "@playwright/test";
 
 export type RoleKey = "owner" | "admin" | "manager" | "staff" | "client" | "member";
 
-/** Credentials created by `npm run e2e:prepare` for the throwaway local database. */
-export function credentials(role: RoleKey): { email: string; password: string } {
-  const file = join(process.cwd(), ".wrangler", "e2e-state", "users.json");
+/**
+ * Credentials created by `npm run e2e:prepare` for the throwaway local database. `set` picks a
+ * separate account set (e.g. "adm"), so suites don't share sign-in code cooldowns.
+ */
+export function credentials(role: RoleKey, set?: string): { email: string; password: string } {
+  const file = join(
+    process.cwd(),
+    ".wrangler",
+    "e2e-state",
+    set ? `users-${set}.json` : "users.json",
+  );
   const all = JSON.parse(readFileSync(file, "utf8")) as Record<
     string,
     { email: string; password: string }
@@ -34,17 +42,22 @@ export async function latestCode(request: APIRequestContext, email: string): Pro
   return code as string;
 }
 
-export async function signIn(page: Page, role: RoleKey, next?: string): Promise<void> {
-  const { email, password } = credentials(role);
+export async function signIn(
+  page: Page,
+  role: RoleKey,
+  next?: string,
+  set?: string,
+): Promise<void> {
+  const { email, password } = credentials(role, set);
   await page.goto(next ? `/login?next=${encodeURIComponent(next)}` : "/login");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
 }
 
-export async function completeCode(page: Page, role: RoleKey): Promise<void> {
+export async function completeCode(page: Page, role: RoleKey, set?: string): Promise<void> {
   await expect(page).toHaveURL(/\/login\/verify/);
-  const code = await latestCode(page.request, credentials(role).email);
+  const code = await latestCode(page.request, credentials(role, set).email);
   await page.getByLabel("Code").fill(code);
   await page.getByRole("button", { name: "Verify and sign in" }).click();
 }

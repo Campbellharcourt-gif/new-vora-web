@@ -20,10 +20,17 @@ import type { Route } from "./+types/ai";
  */
 export async function loader({ context, request }: Route.LoaderArgs) {
   const actor = await requirePermission(context, request, "admin.access");
-  return aiOverview(load(context).server, actor).catch((error) => {
+  const overview = await aiOverview(load(context).server, actor).catch((error) => {
     failureFrom(error);
     throw error;
   });
+  // Built here so server-only names (the key's variable) never ship in the client bundle.
+  const offReasons = [
+    !overview.configured ? "no API key is set on the server (GEMINI_API_KEY)" : null,
+    !overview.config.adminEnabled ? "admin tools are switched off below" : null,
+    !overview.flags.admin ? "the ai.admin_tools feature is off (Settings › Features)" : null,
+  ].filter((r): r is string => r !== null);
+  return { ...overview, offReasons };
 }
 
 export async function action({ context, request }: Route.ActionArgs) {
@@ -63,11 +70,7 @@ export default function AiAdmin({ loaderData: d }: Route.ComponentProps) {
   const busy = useNavigation().state === "submitting";
   const c = d.config;
   const adminReady = d.configured && c.adminEnabled && d.flags.admin;
-  const reasons = [
-    !d.configured ? "no API key is set on the server (GEMINI_API_KEY)" : null,
-    !c.adminEnabled ? "admin tools are switched off below" : null,
-    !d.flags.admin ? "the ai.admin_tools feature is off (Settings › Features)" : null,
-  ].filter(Boolean);
+  const reasons = d.offReasons;
   return (
     <>
       <PageHeading

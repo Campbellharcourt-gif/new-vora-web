@@ -13,8 +13,8 @@ let problems: string[];
 test.beforeAll(async ({ browser }) => {
   page = await browser.newPage();
   problems = watchPage(page);
-  await signIn(page, "admin", "/admin");
-  await completeCode(page, "admin");
+  await signIn(page, "admin", "/admin", "adm");
+  await completeCode(page, "admin", "adm");
   await expect(page).toHaveURL(/\/admin$/);
   await page.waitForLoadState("networkidle");
 });
@@ -137,8 +137,8 @@ test.describe("admin workspace", () => {
 
   test("staff can't open admin-only screens", async ({ page }) => {
     // A separate browser context: the staff account signs in on its own.
-    await signIn(page, "staff", "/admin");
-    await completeCode(page, "staff");
+    await signIn(page, "staff", "/admin", "adm");
+    await completeCode(page, "staff", "adm");
     await expect(page).toHaveURL(/\/admin$/);
     for (const path of ["/admin/users", "/admin/settings", "/admin/security", "/admin/audit"]) {
       const response = await page.goto(path);

@@ -4,7 +4,7 @@
  * Wrangler state directories. The directory names are unchanged, so the E2E specs (which read
  * `.wrangler/e2e-state/users.json`) are unchanged; `.wrangler/` is git-ignored local state.
  *
- *   .wrangler/e2e-state/vora.db             migrated, seeded, one dev user per role (+ the "sec" set)
+ *   .wrangler/e2e-state/vora.db             migrated, seeded, one dev user per role (+ the "sec" and "adm" sets)
  *   .wrangler/e2e-setup-state/vora.db       migrated, seeded, no users — /setup in a normal browser
  *   .wrangler/e2e-setup-nojs-state/vora.db  the same, for /setup without JavaScript
  */
@@ -29,6 +29,9 @@ try {
   writeFileSync(`${MAIN}/users.json`, JSON.stringify(users.credentials, null, 2));
   const sec = await createDevUsers(main, "sec");
   writeFileSync(`${MAIN}/users-sec.json`, JSON.stringify(sec.credentials, null, 2));
+  // The admin workspace spec signs in on its own accounts (sign-in code cooldowns are per account).
+  const adm = await createDevUsers(main, "adm");
+  writeFileSync(`${MAIN}/users-adm.json`, JSON.stringify(adm.credentials, null, 2));
 } finally {
   main.close();
 }
