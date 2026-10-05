@@ -105,7 +105,6 @@ export async function action({ context, request }: Route.ActionArgs) {
   }
 }
 
-
 export default function Content({ loaderData }: Route.ComponentProps) {
   const { pages, summary, home, announcement, socials, platforms } = loaderData;
   const result = useActionData<typeof action>();

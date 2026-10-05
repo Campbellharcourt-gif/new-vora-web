@@ -35,9 +35,12 @@ export function contentPublicPath(kind: ContentKind, key: string): string | null
   }
 }
 
-/** The content type an admin URL belongs to (/admin/<segment>/…). */
+/**
+ * The content type an admin URL belongs to (/admin/<segment>/…). Single-fetch data requests
+ * arrive as /admin/projects.data, so a trailing ".data" is ignored.
+ */
 export function contentKindFromPath(pathname: string): ContentKind | null {
-  const segment = pathname.split("/")[2];
+  const segment = pathname.replace(/\.data$/, "").split("/")[2];
   switch (segment) {
     case "projects":
       return "project";

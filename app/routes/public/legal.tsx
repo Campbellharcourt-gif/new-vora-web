@@ -13,7 +13,8 @@ const TITLES = { terms: "Terms", privacy: "Privacy", cookies: "Cookies" } as con
 type LegalKey = keyof typeof TITLES;
 
 function keyFromUrl(url: string): LegalKey {
-  const path = new URL(url).pathname.replace(/^\//, "");
+  // Single-fetch data requests arrive as /terms.data.
+  const path = new URL(url).pathname.replace(/^\//, "").replace(/\.data$/, "");
   return path === "terms" || path === "privacy" || path === "cookies" ? path : "privacy";
 }
 
