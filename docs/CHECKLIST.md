@@ -106,3 +106,19 @@ Hero (3) · Public site (4) · Backend/CMS/admin (5) · Portals (6) · VORA AI (
 - [!] R8 — accounts (Railway project, volume, sealed variables, spending limit; R2 buckets + tokens; Cloudflare rules, Access, DNS) — your approval (D20–D22, D24)
 - [ ] R9 — staging deploy and verification of every NOT VERIFIED item
 - [ ] R10 — production cutover (separate approval; Mark4 kept 14 days)
+
+## Phase 3 — Full platform (report: `PLATFORM-REPORT.md`)
+- [x] Client/Member registration with emailed confirmation; optional emailed two-step
+- [x] RBAC enforced in services and loaders; RBAC matrix + portal isolation tests
+- [x] Admin: dashboard, enquiries (search, filters, assignment), clients and client projects
+- [x] Users, staff, members, user pages, custom roles (Owner)
+- [x] CMS: drafts, publishing, versions, restore; content hub (home lines, announcement, social)
+- [x] Private files (validated, metadata stripped, policy-checked downloads)
+- [x] Settings, security events, sign-in activity, audit log
+- [x] Privacy: data download, deletion requests, admin queue
+- [x] Notifications (in-app)
+- [x] VORA AI admin tools, status and usage
+- [x] Enquiry “What happens after sending” copy; legal page names and footer links
+- [!] Legal documents — supplied separately; publish them in Admin › Content
+- [ ] WebKit/Firefox E2E (`npm run test:e2e:browsers`) — NOT VERIFIED here
+- [ ] Not deployed — awaiting your review and approval

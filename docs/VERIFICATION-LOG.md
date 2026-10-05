@@ -602,3 +602,29 @@ No code changed.
 - The external URLs (x.com, Discord, sailgaming.store, eonclothing.store) come from settings and
   seed data; their reachability was not checked from this sandbox.
 
+
+---
+
+## CP-5 — Full platform: accounts, admin, CMS, client portal, privacy, AI · 5 Oct 2026 · build sandbox
+
+Branch `claude/charming-newton-fuhcej`, final commit of the work (see `docs/PLATFORM-REPORT.md`).
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` · `npm run lint` · `npm run build` | PASS |
+| `npm run test:unit` | PASS — 244/244, 21 files |
+| `npm run test:integration` | PASS — 220/220, 24 files |
+| `npm run test:e2e` (Chromium desktop + Pixel 7) | PASS — 117/117 |
+| `npm run test:e2e:https` | PASS — 7/7 |
+| `npm run security:scan` | PASS — no findings |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| `npm run test:e2e:browsers` (WebKit, Firefox) | **NOT VERIFIED** — not installed in this sandbox |
+
+**What this proves:** registration, RBAC for every account type (services, API and pages), data
+isolation between clients, the CMS publish/restore flow, private file handling, enquiry tooling,
+privacy controls, notifications and the AI guard rails behave as specified against the production
+build with a throwaway local database.
+
+**What it does not prove:** anything about a hosted environment (nothing was deployed), Safari or
+Firefox behaviour, real email delivery, real Turnstile or a real Gemini key (fakes and the capture
+transport were used), or the legal text (not supplied, so not published).
