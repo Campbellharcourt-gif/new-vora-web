@@ -1,10 +1,5 @@
 import { index, layout, type RouteConfig, route } from "@react-router/dev/routes";
 
-/**
- * Route map (see docs/01-ARCHITECTURE.md §3). Public pages share the site layout; auth pages the
- * minimal auth layout; account/admin/client/member are guarded areas using the workspace theme.
- * Legacy Mark4 URLs are redirected in the kernel before React Router runs.
- */
 export default [
   layout("routes/public/_layout.tsx", [
     index("routes/public/home.tsx"),
@@ -22,7 +17,6 @@ export default [
     route("cookies", "routes/public/legal.tsx", { id: "legal-cookies" }),
     route("status", "routes/public/status.tsx"),
   ]),
-
   layout("routes/auth/_layout.tsx", [
     route("login", "routes/auth/login.tsx"),
     route("login/verify", "routes/auth/login-verify.tsx"),
@@ -35,23 +29,29 @@ export default [
     route("verify-email/:token", "routes/auth/verify-email.tsx"),
   ]),
   route("logout", "routes/auth/logout.tsx"),
-
   route("account", "routes/account/_layout.tsx", [
     index("routes/account/index.tsx"),
     route("security", "routes/account/security.tsx"),
   ]),
-
   route("admin", "routes/admin/_layout.tsx", [
     index("routes/admin/dashboard.tsx"),
     route("enquiries", "routes/admin/enquiries.tsx"),
     route("enquiries/:id", "routes/admin/enquiry.tsx"),
+    route("clients", "routes/admin/clients.tsx"),
+    route("engagements", "routes/admin/engagements.tsx"),
+    route("projects", "routes/admin/projects.tsx"),
+    route("projects/:id", "routes/admin/project.tsx"),
+    route("services", "routes/admin/services.tsx"),
+    route("services/:id", "routes/admin/service.tsx"),
+    route("content", "routes/admin/content.tsx"),
+    route("settings", "routes/admin/settings.tsx"),
+    route("security", "routes/admin/security.tsx"),
+    route("audit", "routes/admin/audit.tsx"),
     route("users", "routes/admin/users.tsx"),
     route("system", "routes/admin/system.tsx"),
   ]),
-
   route("client", "routes/client/_layout.tsx", [index("routes/client/index.tsx")]),
   route("member", "routes/member/_layout.tsx", [index("routes/member/index.tsx")]),
-
   route("sitemap.xml", "routes/system/sitemap.ts"),
   route("robots.txt", "routes/system/robots.ts"),
   route("*", "routes/system/not-found.tsx"),
